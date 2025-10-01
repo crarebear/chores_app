@@ -1080,6 +1080,7 @@
         const Marketplace = ({ isParent, showToast }) => {
             const { user, userData } = useContext(AuthContext); 
             const [items, setItems] = useState([]);
+            const [isCashModalOpen, setCashModalOpen] = useState(false);
             
             useEffect(() => {
                 if(!userData.familyId) return;
@@ -1131,6 +1132,15 @@
                 <div>
                     <h3 className="section-title">Marketplace</h3>
                     <ul className="list-group">
+                         <li className="list-item" style={{backgroundColor: '#e0f2f1'}}>
+                            <div className="item-details">
+                                <h4>Redeem for Cash</h4>
+                                <p>Convert your points into real money!</p>
+                            </div>
+                            <div className="action-buttons">
+                                <button className="redeem-btn" style={{backgroundColor: '#00796b', color: 'white'}} onClick={() => setCashModalOpen(true)}>Redeem</button>
+                            </div>
+                        </li>
                         {items.map(item => (
                             <li key={item.id} className="list-item">
                                 <div className="item-details">
@@ -1145,6 +1155,7 @@
                         ))}
                     </ul>
                     {items.length === 0 && <p className="no-tasks">No items in the marketplace yet.</p>}
+                    {isCashModalOpen && <CashRedemptionModal isOpen={isCashModalOpen} setIsOpen={setCashModalOpen} showToast={showToast} />}
                 </div>
             );
         };
@@ -1261,11 +1272,13 @@
             const [inviteEmail, setInviteEmail] = useState(""); 
             const [selectedColor, setSelectedColor] = useState(userData.userColor || "");
             const [familyName, setFamilyName] = useState(familyData ? familyData.name : "");
+            const [cashMultiplier, setCashMultiplier] = useState(familyData ? familyData.cashConversionMultiplier : 4);
             const isParent = userData.role === "parent";
 
             useEffect(() => {
                 if (familyData) {
                     setFamilyName(familyData.name);
+                    setCashMultiplier(familyData.cashConversionMultiplier || 4);
                 }
             }, [familyData]);
             
@@ -1341,6 +1354,19 @@
                 }
             };
             
+            const handleUpdateMultiplier = async (e) => {
+                e.preventDefault();
+                if (!isParent) return;
+                try {
+                    await db.collection("families").doc(userData.familyId).update({
+                        cashConversionMultiplier: parseInt(cashMultiplier)
+                    });
+                    showToast("success", "Cash multiplier updated!");
+                } catch (error) {
+                    showToast("error", "Could not update multiplier.");
+                }
+            };
+            
             const colors = ["#006D75", "#E0218A", "#FF6B6B", "#4ECDC4", "#45B7D1", "#F7D16A", "#FFA07A", "#98D8C8", "#8260C2", "#57E2E5"];
             return (
                 <div>
@@ -1394,6 +1420,13 @@
                                     <label>Family Name:</label>
                                     <input type="text" value={familyName} onChange={(e) => setFamilyName(e.target.value)} required />
                                     <button type="submit">Update</button>
+                                </div>
+                            </form>
+                            <form onSubmit={handleUpdateMultiplier}>
+                                <div className="input-group">
+                                    <label>Cash Conversion (points per $1):</label>
+                                    <input type="number" min="1" value={cashMultiplier} onChange={(e) => setCashMultiplier(e.target.value)} required />
+                                    <button type="submit">Set</button>
                                 </div>
                             </form>
                             <ul className="list-group" style={{marginTop: "20px"}}>
@@ -1617,6 +1650,84 @@
                             <div className="input-group"><label>Cost:</label><input type="number" min="1" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} required /></div>
                             <button type="submit" className="full-width-button">Add Reward</button>
                         </form>
+                    </div>
+                </div>
+            );
+        };
+        const CashRedemptionModal = ({ isOpen, setIsOpen, showToast }) => {
+            const { user, userData, familyData } = useContext(AuthContext);
+            const [pointsToRedeem, setPointsToRedeem] = useState("");
+            const cashMultiplier = familyData?.cashConversionMultiplier || 4;
+
+            const handlePurchase = async () => {
+                const points = parseInt(pointsToRedeem);
+                if (isNaN(points) || points <= 0 || points > userData.points) {
+                    showToast("error", "Invalid number of points.");
+                    return;
+                }
+
+                const userRef = db.collection("users").doc(user.uid);
+                const purchasedRewardRef = db.collection("purchased_rewards").doc();
+                const cashValue = (points / cashMultiplier).toFixed(2);
+
+                try {
+                    await db.runTransaction(async (transaction) => {
+                        const userDoc = await transaction.get(userRef);
+                        const newPoints = (userDoc.data()?.points || 0) - points;
+                        transaction.update(userRef, { points: newPoints });
+                        transaction.set(purchasedRewardRef, {
+                            name: `Cash Redemption: $${cashValue}`,
+                            description: `${points} points redeemed for cash.`,
+                            cost: points,
+                            purchasedBy: user.uid,
+                            purchasedByDisplayName: userData.displayName,
+                            familyId: userData.familyId,
+                            purchasedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            isFulfilled: false,
+                            fulfilledAt: null,
+                            providerId: 'CASH_REDEMPTION',
+                            providerDisplayName: 'System'
+                        });
+                    });
+                    showToast("success", `Redeemed ${points} points for $${cashValue}!`, () => {
+                         db.runTransaction(async (transaction) => {
+                            const userDoc = await transaction.get(userRef);
+                            const newPoints = (userDoc.data()?.points || 0) + points;
+                            transaction.update(userRef, { points: newPoints });
+                            transaction.delete(purchasedRewardRef);
+                        });
+                    });
+                    setPointsToRedeem("");
+                    setIsOpen(false);
+                } catch (error) {
+                    showToast("error", "Failed to redeem points.");
+                }
+            };
+            
+            if (!isOpen) return null;
+
+            const cashValue = pointsToRedeem ? (parseInt(pointsToRedeem) / cashMultiplier).toFixed(2) : "0.00";
+
+            return (
+                 <div className="modal-overlay" onClick={() => setIsOpen(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header"><h3>Redeem for Cash</h3><button className="close-btn" onClick={() => setIsOpen(false)}>&times;</button></div>
+                        <div>
+                            <p>You have {userData.points} points. {cashMultiplier} points = $1.00.</p>
+                            <div className="input-group">
+                                <label>Points to redeem:</label>
+                                <input 
+                                    type="number" 
+                                    value={pointsToRedeem}
+                                    onChange={e => setPointsToRedeem(e.target.value)} 
+                                    max={userData.points}
+                                    min="1"
+                                    placeholder="Enter points"
+                                />
+                            </div>
+                            <p>Cash value: <strong>${cashValue}</strong></p>
+                            <button className="full-width-button" onClick={handlePurchase} disabled={!pointsToRedeem || parseInt(pointsToRedeem) > userData.points}>Confirm</button>
+                        </div>
                     </div>
                 </div>
             );
