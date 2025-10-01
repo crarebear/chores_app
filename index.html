@@ -891,14 +891,24 @@
                 return () => unsubscribe();
             }, [userData.familyId]);
             
-            const handleDeleteChore = async (choreId) => { if(isParent) await db.collection("chores").doc(choreId).delete(); };
+            const handleDeleteChore = async (chore) => {
+                if (isParent) {
+                    await db.collection("chores").doc(chore.id).delete();
+                    showToast("success", "Chore deleted!", () => {
+                        db.collection("chores").doc(chore.id).set(chore);
+                    });
+                }
+            };
 
-            const handleAssignChore = async (choreId, assignedToUid) => {
+            const handleAssignChore = async (chore, assignedToUid) => {
                 if(!isParent) return;
+                const originalAssignee = chore.assignedTo;
                 const member = familyMembers.find(m => m.uid === assignedToUid);
                 const updateData = assignedToUid ? { assignedTo: assignedToUid, assignedToDisplayName: member.displayName } : { assignedTo: null, assignedToDisplayName: null };
-                await db.collection("chores").doc(choreId).update(updateData);
-                showToast("success", "Chore assigned!");
+                await db.collection("chores").doc(chore.id).update(updateData);
+                showToast("success", "Chore assigned!", () => {
+                     db.collection("chores").doc(chore.id).update({ assignedTo: originalAssignee, assignedToDisplayName: familyMembers.find(m=>m.uid === originalAssignee)?.displayName || null });
+                });
             };
 
             const handleCompleteChore = async (chore) => {
@@ -911,7 +921,14 @@
                         transaction.update(userRef, { points: newPoints });
                         transaction.update(choreRef, { isComplete: true, completedBy: user.uid, completedByEmail: user.email, completedAt: firebase.firestore.FieldValue.serverTimestamp() });
                     });
-                    showToast("success", "Chore completed!");
+                    showToast("success", "Chore completed!", () => {
+                         db.runTransaction(async (transaction) => {
+                            const userDoc = await transaction.get(userRef);
+                            const newPoints = (userDoc.data()?.points || 0) - chore.points;
+                            transaction.update(userRef, { points: newPoints });
+                            transaction.update(choreRef, { isComplete: false, completedBy: null, completedByEmail: null, completedAt: null });
+                        });
+                    });
                 } catch (error) { 
                     console.error("Transaction failed: ", error); 
                     showToast("error", "Could not complete chore.");
@@ -930,8 +947,8 @@
                                     </div>
                                     <div className="action-buttons">
                                         {isParent && <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>}
-                                        {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore.id)}>Delete</button>}
-                                        {isParent && <select className="assign-select" value={chore.assignedTo || ""} onChange={(e) => handleAssignChore(chore.id, e.target.value)}><option value="">Assign To</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
+                                        {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore)}>Delete</button>}
+                                        {isParent && <select className="assign-select" value={chore.assignedTo || ""} onChange={(e) => handleAssignChore(chore, e.target.value)}><option value="">Assign To</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
                                         <button className="complete-btn" onClick={() => handleCompleteChore(chore)}>Done</button>
                                     </div>
                                 </li>
@@ -970,17 +987,34 @@
                     transaction.update(userRef, { points: newPoints });
                     transaction.update(choreRef, { isComplete: true, completedBy: user.uid, completedByEmail: user.email, completedAt: firebase.firestore.FieldValue.serverTimestamp() });
                 });
-                showToast("success", "Chore completed!");
+                 showToast("success", "Chore completed!", () => {
+                     db.runTransaction(async (transaction) => {
+                        const userDoc = await transaction.get(userRef);
+                        const newPoints = (userDoc.data()?.points || 0) - chore.points;
+                        transaction.update(userRef, { points: newPoints });
+                        transaction.update(choreRef, { isComplete: false, completedBy: null, completedByEmail: null, completedAt: null });
+                    });
+                });
             };
 
-            const handleDeleteChore = async (choreId) => { if(isParent) await db.collection("chores").doc(choreId).delete(); };
+            const handleDeleteChore = async (chore) => {
+                if (isParent) {
+                    await db.collection("chores").doc(chore.id).delete();
+                    showToast("success", "Chore deleted!", () => {
+                        db.collection("chores").doc(chore.id).set(chore);
+                    });
+                }
+            };
             
-            const handleReassignChore = async (choreId, assignedToUid) => {
+            const handleReassignChore = async (chore, assignedToUid) => {
                 if(!isParent) return;
+                const originalAssignee = chore.assignedTo;
                 const member = familyMembers.find(m => m.uid === assignedToUid);
                 const updateData = assignedToUid ? { assignedTo: assignedToUid, assignedToDisplayName: member.displayName } : { assignedTo: null, assignedToDisplayName: null };
-                await db.collection("chores").doc(choreId).update(updateData);
-                showToast("success", "Chore reassigned!");
+                await db.collection("chores").doc(chore.id).update(updateData);
+                 showToast("success", "Chore reassigned!", () => {
+                     db.collection("chores").doc(chore.id).update({ assignedTo: originalAssignee, assignedToDisplayName: familyMembers.find(m=>m.uid === originalAssignee)?.displayName || null });
+                });
             };
 
             const filteredChores = assignedChores.filter(chore => {
@@ -1005,8 +1039,8 @@
                                 </div>
                                 <div className="action-buttons">
                                     {isParent && <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>}
-                                    {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore.id)}>Delete</button>}
-                                    {isParent && <select className="assign-select" value={chore.assignedTo} onChange={(e) => handleReassignChore(chore.id, e.target.value)}><option value="">Unassign</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
+                                    {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore)}>Delete</button>}
+                                    {isParent && <select className="assign-select" value={chore.assignedTo} onChange={(e) => handleReassignChore(chore, e.target.value)}><option value="">Unassign</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
                                     {chore.assignedTo === user.uid && <button className="complete-btn" onClick={() => handleCompleteChore(chore)}>Done</button>} 
                                 </div>
                             </li>
@@ -1017,15 +1051,16 @@
             );
         };
         
-        const RewardsPage = () => {
+        const RewardsPage = ({ showToast }) => {
             const { userData } = useContext(AuthContext);
             const isParent = userData.role === "parent";
             const [activeSubTab, setActiveSubTab] = useState("marketplace");
             
             const renderRewardsContent = () => {
+                const pageProps = { isParent, showToast };
                 switch (activeSubTab) {
-                    case "marketplace": return <Marketplace isParent={isParent} />;
-                    case "unfulfilled": return <UnfulfilledRewards isParent={isParent} />;
+                    case "marketplace": return <Marketplace {...pageProps} />;
+                    case "unfulfilled": return <UnfulfilledRewards {...pageProps} />;
                     case "fulfilled": return <RedeemedLog />;
                     default: return null;
                 }
@@ -1042,7 +1077,7 @@
             );
         };
 
-        const Marketplace = ({ isParent }) => {
+        const Marketplace = ({ isParent, showToast }) => {
             const { user, userData } = useContext(AuthContext); 
             const [items, setItems] = useState([]);
             
@@ -1056,12 +1091,12 @@
 
             const handlePurchase = async (item) => {
                 const userRef = db.collection("users").doc(user.uid); 
+                const purchasedRewardRef = db.collection("purchased_rewards").doc();
                 await db.runTransaction(async (transaction) => {
                     const userDoc = await transaction.get(userRef);
                     if (!userDoc.exists || (userDoc.data()?.points || 0) < item.cost) { throw new Error("Not enough points!"); }
                     const newPoints = (userDoc.data().points || 0) - item.cost;
                     transaction.update(userRef, { points: newPoints });
-                    const purchasedRewardRef = db.collection("purchased_rewards").doc();
                     transaction.set(purchasedRewardRef, { 
                         ...item, // copy all fields
                         purchasedBy: user.uid,
@@ -1072,9 +1107,25 @@
                     });
                     transaction.delete(db.collection("marketplace_items").doc(item.id));
                 });
+                showToast("success", "Reward purchased!", () => {
+                    db.runTransaction(async (transaction) => {
+                        const userDoc = await transaction.get(userRef);
+                        const newPoints = (userDoc.data().points || 0) + item.cost;
+                        transaction.update(userRef, { points: newPoints });
+                        transaction.delete(purchasedRewardRef);
+                        transaction.set(db.collection("marketplace_items").doc(item.id), item);
+                    });
+                });
             };
             
-            const handleDelete = async (itemId) => { if(isParent) await db.collection("marketplace_items").doc(itemId).delete(); };
+            const handleDelete = async (item) => {
+                if (isParent) {
+                    await db.collection("marketplace_items").doc(item.id).delete();
+                    showToast("success", "Reward deleted!", () => {
+                        db.collection("marketplace_items").doc(item.id).set(item);
+                    });
+                }
+            };
 
             return (
                 <div>
@@ -1088,7 +1139,7 @@
                                 </div>
                                 <div className="action-buttons">
                                     <button className="redeem-btn" onClick={() => handlePurchase(item)} disabled={userData.points < item.cost}>Redeem</button>
-                                    {isParent && user.uid === item.providerId && ( <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button> )}
+                                    {isParent && user.uid === item.providerId && ( <button className="delete-btn" onClick={() => handleDelete(item)}>Delete</button> )}
                                 </div>
                             </li>
                         ))}
@@ -1098,7 +1149,7 @@
             );
         };
         
-        const UnfulfilledRewards = ({ isParent }) => {
+        const UnfulfilledRewards = ({ isParent, showToast }) => {
             const { user, userData } = useContext(AuthContext);
             const [rewards, setRewards] = useState([]);
 
@@ -1111,6 +1162,9 @@
 
             const handleFulfill = async (rewardId) => {
                 await db.collection("purchased_rewards").doc(rewardId).update({ isFulfilled: true, fulfilledAt: firebase.firestore.FieldValue.serverTimestamp() }); 
+                 showToast("success", "Reward fulfilled!", () => {
+                    db.collection("purchased_rewards").doc(rewardId).update({ isFulfilled: false, fulfilledAt: null });
+                });
             };
             
             return (
@@ -1131,7 +1185,7 @@
             );
         };
 
-        const RecurringChoresManager = ({ openChoreModal }) => {
+        const RecurringChoresManager = ({ openChoreModal, showToast }) => {
             const { userData } = useContext(AuthContext); 
             const [recurringChores, setRecurringChores] = useState([]);
             
@@ -1143,12 +1197,11 @@
                 return () => unsubscribe(); 
             }, [userData.familyId]);
 
-            const handleDeleteClick = async (choreId) => { 
-                await db.collection("recurring_chores").doc(choreId).delete(); 
-                const choresToDeleteSnapshot = await db.collection("chores").where("recurringTemplateId", "==", choreId).where("isComplete", "==", false).get(); 
-                const batch = db.batch(); 
-                choresToDeleteSnapshot.docs.forEach(doc => batch.delete(doc.ref)); 
-                await batch.commit(); 
+            const handleDeleteClick = async (chore) => {
+                await db.collection("recurring_chores").doc(chore.id).delete();
+                showToast("success", "Recurring chore deleted!", () => {
+                    db.collection("recurring_chores").doc(chore.id).set(chore);
+                });
             };
             
             const getFrequencyDetails = (chore) => { if (chore.frequency === "weekly") return `Weekly on ${chore.dayOfWeek}`; if (chore.frequency === "monthly") return `Monthly on day ${chore.dayOfMonth}`; if (chore.frequency === "pickDays") return `On ${chore.pickedDays.join(", ")}`; return chore.frequency; };
@@ -1166,7 +1219,7 @@
                             </div>
                             <div className="action-buttons">
                                 <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>
-                                <button className="delete-btn" onClick={() => handleDeleteClick(chore.id)}>Delete</button>
+                                <button className="delete-btn" onClick={() => handleDeleteClick(chore)}>Delete</button>
                             </div>
                         </li>
                     ))}
@@ -1692,7 +1745,9 @@
                 try {
                     if(editingChore){ 
                         await docRef.update(choreData); 
-                        showToast("success", "Chore updated!");
+                        showToast("success", "Chore updated!", () => {
+                            docRef.set(editingChore);
+                        });
                     } else { 
                         const newDoc = await docRef.set(choreData);
                         showToast("success", "Chore added!", () => {
@@ -1717,7 +1772,7 @@
                 switch (activeTab) {
                     case "chores": return <ChoresPage {...pageProps} />;
                     case "my-completed": return <MyCompletedChoresPage />;
-                    case "rewards": return <RewardsPage />;
+                    case "rewards": return <RewardsPage {...pageProps} />;
                     case "leaderboard": return <LeaderboardPage />;
                     case "activity": return <ActivityFeedPage />;
                     case "notifications": return <NotificationSettingsPage />;
