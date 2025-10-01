@@ -53,6 +53,7 @@
         .day-picker input[type="checkbox"]:checked + label { background-color: #6a0dad; color: white; border-color: #6a0dad; }
         .full-width-button { width: 100%; padding: 12px 20px; background-color: #6a0dad; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 10px; }
         .full-width-button:hover { opacity: 0.9; }
+        .full-width-button:disabled { background-color: #BDBDBD; cursor: not-allowed; }
         .list-group { list-style: none; padding: 0; }
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background-color: #f7f9fc; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
         .list-item .item-details { flex: 1; min-width: 150px; }
@@ -1657,15 +1658,26 @@
         const CashRedemptionModal = ({ isOpen, setIsOpen, showToast }) => {
             const { user, userData, familyData } = useContext(AuthContext);
             const [pointsToRedeem, setPointsToRedeem] = useState("");
+            const [error, setError] = useState("");
             const cashMultiplier = familyData?.cashConversionMultiplier || 4;
+            
+            useEffect(() => {
+                const points = parseInt(pointsToRedeem);
+                if (pointsToRedeem && (isNaN(points) || points <= 0)) {
+                    setError("Please enter a valid number of points.");
+                } else if (points > userData.points) {
+                    setError("You don't have enough points!");
+                } else {
+                    setError("");
+                }
+            }, [pointsToRedeem, userData.points]);
+
 
             const handlePurchase = async () => {
-                const points = parseInt(pointsToRedeem);
-                if (isNaN(points) || points <= 0 || points > userData.points) {
-                    showToast("error", "Invalid number of points.");
-                    return;
-                }
+                if(error) return;
 
+                const points = parseInt(pointsToRedeem);
+                
                 const userRef = db.collection("users").doc(user.uid);
                 const purchasedRewardRef = db.collection("purchased_rewards").doc();
                 const cashValue = (points / cashMultiplier).toFixed(2);
@@ -1699,14 +1711,15 @@
                     });
                     setPointsToRedeem("");
                     setIsOpen(false);
-                } catch (error) {
+                } catch (e) {
                     showToast("error", "Failed to redeem points.");
+                    console.error("Redemption error:", e);
                 }
             };
             
             if (!isOpen) return null;
 
-            const cashValue = pointsToRedeem ? (parseInt(pointsToRedeem) / cashMultiplier).toFixed(2) : "0.00";
+            const cashValue = pointsToRedeem && !error ? (parseInt(pointsToRedeem) / cashMultiplier).toFixed(2) : "0.00";
 
             return (
                  <div className="modal-overlay" onClick={() => setIsOpen(false)}>
@@ -1726,7 +1739,8 @@
                                 />
                             </div>
                             <p>Cash value: <strong>${cashValue}</strong></p>
-                            <button className="full-width-button" onClick={handlePurchase} disabled={!pointsToRedeem || parseInt(pointsToRedeem) > userData.points}>Confirm</button>
+                            {error && <div className="feedback-message error" style={{marginTop: '10px'}}>{error}</div>}
+                            <button className="full-width-button" onClick={handlePurchase} disabled={!!error || !pointsToRedeem}>Confirm</button>
                         </div>
                     </div>
                 </div>

@@ -30,7 +30,7 @@ messaging.onBackgroundMessage((payload) => {
 
 
 // --- PWA Caching Logic (Corrected) ---
-const CACHE_NAME = 'chore-tracker-cache-v2.99.38'; // <-- Increment this version on each deployment
+const CACHE_NAME = 'chore-tracker-cache-v2.99.39'; // <-- Increment this version on each deployment
 const urlsToCache = [
   '/',
   '/index.html' 
