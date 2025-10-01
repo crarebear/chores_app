@@ -423,7 +423,13 @@
 
                 try {
                     const createFamily = functions.httpsCallable("createFamily");
-                    await createFamily({ familyName: familyName.trim() });
+                    const result = await createFamily({ familyName: familyName.trim() });
+                    if(result.data.familyId) {
+                        await db.collection("families").doc(result.data.familyId).update({
+                            rooms: ["Kitchen", "Living Room", "Bedroom"],
+                            cashConversionMultiplier: 4
+                        });
+                    }
                 } catch (error) {
                     console.error("Error creating family:", error);
                     showFeedback("error", error.message || "Could not create family.");
@@ -727,7 +733,7 @@
         };
 
         const LeaderboardPage = () => {
-            const { userData } = useContext(AuthContext);
+            const { userData, familyData } = useContext(AuthContext);
             const [leaderboardData, setLeaderboardData] = useState([]);
             const [roomStats, setRoomStats] = useState({});
             const [loading, setLoading] = useState(true);
@@ -786,7 +792,7 @@
                     <div className="leaderboard-card">
                         <div className="leaderboard-header"><h3>Room Dominance</h3></div>
                         <div className="stats-grid">
-                            {Object.entries(roomStats).map(([room, data]) => {
+                            {familyData.rooms && Object.entries(roomStats).map(([room, data]) => {
                                 const cardStyle = getRoomCardStyle(data.topUser);
                                 const textStyle = { color: cardStyle.color || "#555" };
 
@@ -1272,16 +1278,26 @@
             const [newPassword, setNewPassword] = useState(""); 
             const [inviteEmail, setInviteEmail] = useState(""); 
             const [selectedColor, setSelectedColor] = useState(userData.userColor || "");
-            const [familyName, setFamilyName] = useState(familyData ? familyData.name : "");
-            const [cashMultiplier, setCashMultiplier] = useState(familyData ? familyData.cashConversionMultiplier : 4);
+            const [familyName, setFamilyName] = useState(familyData?.name || "");
+            const [cashMultiplier, setCashMultiplier] = useState(familyData?.cashConversionMultiplier || 4);
+            const [rooms, setRooms] = useState(familyData?.rooms || []);
+            const [newRoomName, setNewRoomName] = useState("");
+            const [editingRoom, setEditingRoom] = useState({ index: null, name: '' });
             const isParent = userData.role === "parent";
 
             useEffect(() => {
                 if (familyData) {
-                    setFamilyName(familyData.name);
+                    setFamilyName(familyData.name || "");
                     setCashMultiplier(familyData.cashConversionMultiplier || 4);
+                    if (!familyData.rooms) {
+                        const initialRooms = ["Kitchen", "Bedroom", "Bathroom", "Dining Room", "Upstairs Bathroom", "Upstairs Bedroom", "Backyard", "Living Room", "Alex's Office", "Back Bathroom", "Front Hallway"];
+                        db.collection("families").doc(userData.familyId).update({ rooms: initialRooms });
+                        setRooms(initialRooms);
+                    } else {
+                        setRooms(familyData.rooms);
+                    }
                 }
-            }, [familyData]);
+            }, [familyData, userData.familyId]);
             
             const handleUpdateProfile = async (e) => {
                 e.preventDefault();
@@ -1322,7 +1338,7 @@
                 }
             };
             
-             const handleRoleChange = async (uid, newRole) => {
+            const handleRoleChange = async (uid, newRole) => {
                 if (isParent && uid !== user.uid) { // Parents can't change their own role
                     await db.collection("users").doc(uid).update({ role: newRole });
                     showToast("success", "Member role updated!");
@@ -1366,6 +1382,41 @@
                 } catch (error) {
                     showToast("error", "Could not update multiplier.");
                 }
+            };
+
+            const handleAddRoom = async () => {
+                if (!newRoomName.trim()) return;
+                const updatedRooms = [...rooms, newRoomName.trim()];
+                await db.collection("families").doc(userData.familyId).update({ rooms: updatedRooms });
+                setNewRoomName("");
+                showToast("success", "Room added!");
+            };
+
+            const handleDeleteRoom = async (index) => {
+                const roomToDelete = rooms[index];
+                const updatedRooms = rooms.filter((_, i) => i !== index);
+                await db.collection("families").doc(userData.familyId).update({ rooms: updatedRooms });
+                showToast("success", "Room deleted!", () => {
+                     const restoredRooms = [...updatedRooms];
+                     restoredRooms.splice(index, 0, roomToDelete);
+                     db.collection("families").doc(userData.familyId).update({ rooms: restoredRooms });
+                });
+            };
+
+            const handleUpdateRoom = async () => {
+                const updatedRooms = [...rooms];
+                updatedRooms[editingRoom.index] = editingRoom.name;
+                await db.collection("families").doc(userData.familyId).update({ rooms: updatedRooms });
+                setEditingRoom({ index: null, name: '' });
+                showToast("success", "Room updated!");
+            };
+
+            const handleMoveRoom = async (index, direction) => {
+                const newIndex = direction === 'up' ? index - 1 : index + 1;
+                if (newIndex < 0 || newIndex >= rooms.length) return;
+                const updatedRooms = [...rooms];
+                [updatedRooms[index], updatedRooms[newIndex]] = [updatedRooms[newIndex], updatedRooms[index]]; // Swap
+                await db.collection("families").doc(userData.familyId).update({ rooms: updatedRooms });
             };
             
             const colors = ["#006D75", "#E0218A", "#FF6B6B", "#4ECDC4", "#45B7D1", "#F7D16A", "#FFA07A", "#98D8C8", "#8260C2", "#57E2E5"];
@@ -1430,6 +1481,39 @@
                                     <button type="submit">Set</button>
                                 </div>
                             </form>
+                            
+                            <h3 style={{marginTop: '30px'}}>Manage Rooms</h3>
+                             <div className="input-group">
+                                <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="New room name" />
+                                <button onClick={handleAddRoom}>Add Room</button>
+                            </div>
+                             <ul className="list-group" style={{marginTop: "20px"}}>
+                                {rooms.map((room, index) => (
+                                    <li key={index} className="list-item">
+                                        {editingRoom.index === index ? (
+                                            <>
+                                                <input type="text" value={editingRoom.name} onChange={(e) => setEditingRoom({...editingRoom, name: e.target.value})} />
+                                                <div className="action-buttons">
+                                                    <button className="complete-btn" onClick={handleUpdateRoom}>Save</button>
+                                                    <button className="delete-btn" onClick={() => setEditingRoom({index: null, name: ''})}>Cancel</button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>{room}</span>
+                                                <div className="action-buttons">
+                                                    <button onClick={() => handleMoveRoom(index, 'up')} disabled={index === 0}>↑</button>
+                                                    <button onClick={() => handleMoveRoom(index, 'down')} disabled={index === rooms.length - 1}>↓</button>
+                                                    <button className="edit-btn" onClick={() => setEditingRoom({index, name: room})}>Edit</button>
+                                                    <button className="delete-btn" onClick={() => handleDeleteRoom(index)}>Delete</button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+
+                            <h3 style={{marginTop: '30px'}}>Family Members</h3>
                             <ul className="list-group" style={{marginTop: "20px"}}>
                                 {familyMembers.map(member => (
                                     <li key={member.uid} className="list-item">
@@ -1748,7 +1832,7 @@
         };
 
         const App = () => {
-            const { user, userData, familyMembers } = useContext(AuthContext);
+            const { user, userData, familyMembers, familyData } = useContext(AuthContext);
             if (!user || !userData) { return <LoginSignup />; }
             
             const [activeTab, setActiveTab] = useState("chores"); 
@@ -1916,10 +2000,7 @@
                 { id: "notifications", label: "Settings" },
                 { id: "profile", label: "Profile" },
             ];
-
-            const roomOptions = ["Kitchen", "Bedroom", "Bathroom", "Dining Room", "Upstairs Bathroom", "Upstairs Bedroom", "Backyard", "Living Room", "Alex's Office", "Back Bathroom", "Front Hallway"];
-            const daysOfWeekOptions = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
+            
             return (
                 <>
                     <div className={`sidenav ${isMenuOpen ? "open" : ""}`}>
@@ -1964,14 +2045,14 @@
                                 <form onSubmit={handleChoreSubmit}>
                                     <div className="input-group"><label>Title:</label><input type="text" value={newChore} onChange={(e) => setNewChore(e.target.value)} required /></div>
                                     <div className="input-group"><label>Points:</label><input type="number" min="1" value={pointsValue} onChange={(e) => setPointsValue(e.target.value)} required /></div>
-                                    <div className="input-group"><label>Room:</label><select value={room} onChange={(e) => setRoom(e.target.value)}><option value="">Select Room</option>{roomOptions.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                                    <div className="input-group"><label>Room:</label><select value={room} onChange={(e) => setRoom(e.target.value)}><option value="">Select Room</option>{(familyData?.rooms || []).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
                                     <div className="input-group"><label>Repeat?</label><div className="radio-group"><label><input type="radio" name="repeat" checked={!isRepeating} onChange={() => setIsRepeating(false)} /> No</label><label><input type="radio" name="repeat" checked={isRepeating} onChange={() => setIsRepeating(true)} /> Yes</label></div></div>
                                     {isRepeating && (
                                         <>
                                             <div className="input-group"><label>Frequency:</label><select value={frequency} onChange={(e) => setFrequency(e.target.value)}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="pickDays">Pick Days</option></select></div>
-                                            {frequency === "weekly" && (<div className="input-group"><label>Day:</label><select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} required><option value="">Select Day</option>{daysOfWeekOptions.map(day => <option key={day} value={day}>{day}</option>)}</select></div>)}
+                                            {frequency === "weekly" && (<div className="input-group"><label>Day:</label><select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} required><option value="">Select Day</option>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => <option key={day} value={day}>{day}</option>)}</select></div>)}
                                             {frequency === "monthly" && (<div className="input-group"><label>Day:</label><input type="number" min="1" max="31" value={dayOfMonth} onChange={(e) => setDayOfMonth(e.target.value)} required /></div>)}
-                                            {frequency === "pickDays" && (<div className="input-group"><label>Days:</label><div className="day-picker">{daysOfWeekOptions.map(day => (<div key={day}><input type="checkbox" id={`day-${day}`} checked={pickedDays.includes(day)} onChange={() => handleDayToggle(day)} /><label htmlFor={`day-${day}`}>{day.substring(0,3)}</label></div>))}</div></div>)}
+                                            {frequency === "pickDays" && (<div className="input-group"><label>Days:</label><div className="day-picker">{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => (<div key={day}><input type="checkbox" id={`day-${day}`} checked={pickedDays.includes(day)} onChange={() => handleDayToggle(day)} /><label htmlFor={`day-${day}`}>{day.substring(0,3)}</label></div>))}</div></div>)}
                                         </>
                                     )}
                                     <div className="input-group"><label>Assigned To:</label><select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}><option value="">Unassigned</option>{familyMembers.map(member => (<option key={member.uid} value={member.uid}>{member.displayName}</option>))}</select></div>
