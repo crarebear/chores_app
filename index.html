@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Chore Tracker</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6a0dad">
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/6a0dad/ffffff?text=Chores">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; overflow-x: hidden; }
+        body { font-family: 'Comfortaa', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f7f9; padding: 20px; color: #333; display: flex; flex-direction: column; min-height: 100vh; }
+        .app-container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); overflow: hidden; flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        .header { display: flex; align-items: center; padding: 15px 20px; background-color: #6a0dad; color: white; border-bottom: 2px solid #540989; flex-wrap: nowrap; gap: 15px; }
+        .header h1 { margin: 0; font-size: 1.6rem; text-align: center; flex-grow: 1; }
+        .header-points-box { background-color: rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 5px 12px; text-align: center; flex-shrink: 0; cursor: pointer; }
+        .header-points-box p { margin: 0; font-size: 0.75rem; font-weight: 500; opacity: 0.9; }
+        .header-points-box h2 { margin: 0; font-size: 1.5rem; color: white; }
+        .menu-btn { background: none; border: none; cursor: pointer; padding: 10px; display: flex; flex-direction: column; justify-content: space-around; width: 40px; height: 40px; z-index: 1001; flex-shrink: 0; }
+        .menu-btn .bar { width: 100%; height: 3px; background-color: white; border-radius: 2px; transition: all 0.3s ease-in-out; }
+        .sidenav { height: 100%; width: 250px; position: fixed; z-index: 1000; top: 0; left: -250px; background-color: #fff; overflow-x: hidden; transition: 0.3s; padding-top: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .sidenav.open { left: 0; }
+        .sidenav .nav-links { flex-grow: 1; }
+        .sidenav a { padding: 10px 15px; text-decoration: none; font-size: 1.1rem; font-weight: 600; color: #333; display: block; transition: 0.2s; }
+        .sidenav a:hover, .sidenav a.active { background-color: #f0f4f7; color: #6a0dad; }
+        .sidenav .sidebar-action { padding: 15px; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .overlay.visible { opacity: 1; visibility: visible; }
+        .content { padding: 30px; flex-grow: 1; overflow-y: auto; }
+        .section-title { font-size: 1.5rem; margin-top: 0; margin-bottom: 20px; color: #6a0dad; }
+        .form-section { margin-bottom: 30px; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .form-section h3 { margin-top: 0; color: #6a0dad; font-size: 1.3rem; margin-bottom: 20px;}
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: flex-end;}
+        .input-group label { flex-basis: 100%; font-size: 0.9rem; color: #555; margin-bottom: 5px; }
+        .input-group input[type="text"], .input-group input[type="email"], .input-group input[type="password"], .input-group input[type="number"], .input-group select, .input-group textarea { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; min-width: 150px; }
+        .input-group button { padding: 12px 20px; background-color: #6a0dad; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+        .input-group button:hover { opacity: 0.9; }
+        .input-group input[type="number"] { width: 80px; flex: none; }
+        .input-group .full-width { flex: 1 1 100%; }
+        .input-group .radio-group { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .input-group .radio-group label { flex-basis: unset; margin-bottom: 0; }
+        .input-group .radio-group input[type="radio"] { width: auto; min-width: unset; flex: none; margin-right: 5px; }
+        .day-picker { display: flex; flex-wrap: wrap; row-gap: 20px; column-gap: 8px; padding-top: 5px; }
+        .day-picker label { flex: 1 1 auto; text-align:center; padding: 8px 10px; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s ease-in-out; user-select: none; }
+        .day-picker input[type="checkbox"] { display: none; }
+        .day-picker input[type="checkbox"]:checked + label { background-color: #6a0dad; color: white; border-color: #6a0dad; }
+        .full-width-button { width: 100%; padding: 12px 20px; background-color: #6a0dad; color: white; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+        .full-width-button:hover { opacity: 0.9; }
+        .list-group { list-style: none; padding: 0; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background-color: #f7f9fc; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
+        .list-item .item-details { flex: 1; min-width: 150px; }
+        .list-item h4 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .list-item p { margin: 0; font-size: 0.9rem; color: #777; }
+        .recurring-tag { background-color: #6a0dad; color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-right: 8px; white-space: nowrap; }
+        .recurring-schedule-tag { background-color: #555; color: white; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; margin-left: 8px; white-space: nowrap; }
+        .complete-btn, .redeem-btn, .edit-btn, .delete-btn, .undo-btn, .assign-btn, .fulfill-btn { padding: 8px 15px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
+        .complete-btn { background-color: #4CAF50; color: white; }
+        .redeem-btn { background-color: #FFC107; color: #333; }
+        .edit-btn { background-color: #2196F3; color: white; }
+        .delete-btn { background-color: #F44336; color: white; }
+        .undo-btn { background-color: #9E9E9E; color: white; }
+        .undo-btn:disabled { background-color: #BDBDBD; cursor: not-allowed; }
+        .assign-btn { background-color: #607D8B; color: white; }
+        .fulfill-btn { background-color: #00BCD4; color: white; }
+        .action-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .assign-select {
+            padding: 8px 15px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;
+            background-color: #607D8B; color: white; transition: background 0.2s;
+            text-align: center; -moz-text-align-last: center; text-align-last: center; font-size: 0.9rem;
+        }
+        .assign-select:disabled { background-color: #b0bec5; color: #eee; cursor: not-allowed; }
+        .no-tasks { text-align: center; color: #999; margin-top: 40px; }
+        .auth-container { display: flex; justify-content: center; align-items: center; min-height: 400px; padding: 20px; flex-grow: 1; }
+        .auth-box { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); text-align: center; max-width: 400px; width: 100%; }
+        .auth-box h2 { color: #6a0dad; margin-bottom: 30px; }
+        .auth-form input { width: calc(100% - 24px); padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+        .auth-form button { width: 100%; padding: 12px; background-color: #6a0dad; color: white; border: none; border-radius: 6px; font-size: 1.1rem; cursor: pointer; margin-bottom: 10px; }
+        .auth-form button:hover { opacity: 0.9; }
+        .auth-toggle { font-size: 0.9rem; color: #777; cursor: pointer; text-decoration: underline; }
+        .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; background-color: #fff; color: #444; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-bottom: 15px; font-weight: 600; }
+        .google-btn:hover { background-color: #f8f8f8; }
+        .google-btn svg { width: 20px; height: 20px; }
+        .auth-divider { display: flex; align-items: center; text-align: center; color: #999; margin: 20px 0; }
+        .auth-divider::before, .auth-divider::after { content: ''; flex: 1; border-bottom: 1px solid #ccc; }
+        .auth-divider:not(:empty)::before { margin-right: .25em; }
+        .auth-divider:not(:empty)::after { margin-left: .25em; }
+        .app-footer { background-color: #f0f4f7; padding: 10px 20px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #666; flex-wrap: wrap; gap: 10px; }
+        .app-footer .user-info-footer { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .app-footer .user-info-footer strong { font-weight: 600; color: #333; }
+        .app-footer button { padding: 5px 10px; border-radius: 5px; border: none; background-color: #8c2ee0; color: white; cursor: pointer; font-size: 0.8rem; }
+        .app-footer button:hover { opacity: 0.9; }
+        .filter-buttons { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 15px; border-radius: 6px; border: 1px solid #ccc; background-color: #f0f0f0; color: #555; cursor: pointer; font-weight: 600; transition: all 0.2s ease-in-out; }
+        .filter-btn.active { background-color: #6a0dad; color: white; border-color: #6a0dad; }
+        .filter-btn:hover:not(.active) { background-color: #e0e0e0; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1050; }
+        .modal { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 90%; max-width: 500px; z-index: 1051; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; color: #6a0dad; }
+        .close-btn { background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #888; }
+        
+        .fab-container { position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 16px; z-index: 900; }
+        .fab { width: 60px; height: 60px; color: white; border: none; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; }
+        .feedback-fab { background-color: #f44336; }
+        .add-chore-fab { background-color: #6a0dad; }
+        .add-reward-fab { background-color: #2e7d32; } /* Darker green */
+        
+        .sub-tab-bar { display: flex; background-color: #f9f9f9; border-bottom: 1px solid #e2e8f0; margin: -30px -30px 20px -30px; }
+        .sub-tab { flex: 1; text-align: center; padding: 12px 5px; font-size: 0.9rem; font-weight: 600; cursor: pointer; color: #555; border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; white-space: nowrap; min-width: 0; }
+        .sub-tab.active { color: #6a0dad; border-bottom-color: #6a0dad; }
+        .feedback-message { padding: 10px; margin-top: 15px; border-radius: 6px; font-size: 0.9rem; text-align: center; }
+        .feedback-message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback-message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .notification-bell { position: relative; cursor: pointer; margin-left: auto; margin-right: 15px; }
+        .notification-bell svg { width: 28px; height: 28px; fill: white; }
+        .notification-count { position: absolute; top: -5px; right: -8px; background-color: #F44336; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.75rem; font-weight: bold; border: 2px solid #6a0dad; }
+        .notification-panel { position: absolute; top: 65px; right: 20px; width: 320px; max-height: 400px; background-color: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1100; border: 1px solid #e2e8f0; display: flex; flex-direction: column; }
+        .notification-list { overflow-y: auto; flex-grow: 1; }
+        .notification-item { padding: 12px 15px; border-bottom: 1px solid #f0f4f7; font-size: 0.9rem; color: #333; }
+        .notification-item:last-child { border-bottom: none; }
+        .notification-item p { margin: 0; }
+        .notification-item small { font-size: 0.75rem; color: #888; }
+        .no-notifications { padding: 20px; text-align: center; color: #999; margin: auto; }
+        .notification-footer { padding: 10px; border-top: 1px solid #e2e8f0; background-color: #f9fafb; }
+        .clear-notifications-btn { width: 100%; padding: 8px 12px; background-color: #F44336; color: white; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
+        .clear-notifications-btn:hover { opacity: 0.9; }
+        
+        .activity-feed { list-style: none; padding: 0; margin: 0; }
+        .activity-item { display: flex; align-items: flex-start; padding: 15px 10px; border-bottom: 1px solid #f0f4f7; }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-icon { width: 40px; height: 40px; flex-shrink: 0; background-color: #e9d5ff; color: #6a0dad; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; margin-right: 15px; font-size: 1.2rem; }
+        .activity-content { flex-grow: 1; }
+        .activity-content p { margin: 0; line-height: 1.5; color: #333; }
+        .activity-content p strong { color: #6a0dad; }
+        .activity-content .timestamp { font-size: 0.8rem; color: #888; margin-top: 4px; }
+        .activity-actions { margin-top: 8px; }
+
+        .settings-list { list-style: none; padding: 0; }
+        .settings-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f0f4f7; flex-wrap: nowrap; }
+        .settings-item:last-child { border-bottom: none; }
+        .settings-item-label { display: flex; flex-direction: column; flex-grow: 1; margin-right: 15px; }
+        .settings-item-label strong { font-size: 1rem; color: #333; }
+        .settings-item-label span { font-size: 0.85rem; color: #777; margin-top: 4px; }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 28px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #6a0dad; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        .leaderboard-card { background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; }
+        .leaderboard-header { padding: 15px 20px; background-color: #f8f4ff; border-bottom: 1px solid #e9d5ff; }
+        .leaderboard-header h3 { margin: 0; color: #6a0dad; }
+        .leaderboard-list { list-style: none; padding: 0; margin: 0; }
+        .leaderboard-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #f0f4f7; }
+        .leaderboard-item:last-child { border-bottom: none; }
+        .leaderboard-rank { font-size: 1.2rem; font-weight: bold; color: #6a0dad; width: 40px; text-align: center; }
+        .leaderboard-user { flex-grow: 1; margin-left: 15px; }
+        .leaderboard-user strong { font-size: 1.1rem; }
+        .leaderboard-user span { font-size: 0.85rem; color: #777; }
+        .leaderboard-points { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; padding: 20px; }
+        .stat-card { background: #f7f9fc; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-card h4 { margin: 0 0 5px 0; font-size: 0.9rem; color: #555; }
+        .stat-card p { margin: 0; font-size: 1.4rem; font-weight: bold; color: #6a0dad; }
+        
+        .room-stat-card { display: flex; flex-direction: column; justify-content: space-between; background: #f7f9fc; padding: 15px; border-radius: 8px; text-align: center; }
+        .room-stat-card h4 { margin: 0 0 5px 0; font-size: 0.9rem; color: #555; flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .room-stats .progress-bar { background-color: #e9d5ff; border-radius: 8px; overflow: hidden; margin-top: auto; }
+        .room-stats .progress-bar div { background-color: #6a0dad; color: white; padding: 2px 5px; font-size: 0.75rem; white-space: nowrap; }
+        .color-palette { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; margin-bottom: 15px; }
+        .color-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+        .color-swatch.selected { border-color: #333; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .content { padding: 15px; }
+            .header { padding: 15px 10px; }
+            .header h1 { font-size: 1.2rem; }
+            .header-points-box h2 { font-size: 1.2rem; }
+            .sub-tab-bar { margin: -15px -15px 15px -15px; }
+            .input-group input[type="text"], .input-group input[type="email"], .input-group input[type="password"], .input-group input[type="number"], .input-group select, .input-group textarea { width: 100%; flex: none; min-width: 0; padding-right: 10px; }
+            .input-group button, .full-width-button { width: 100%; flex: none; padding-right: 20px; }
+            .input-group .radio-group { width: 100%; justify-content: center; }
+            .list-item { flex-direction: column; align-items: flex-start; }
+            .list-item .item-details { width: 100%; margin-bottom: 10px; }
+            .complete-btn, .redeem-btn, .edit-btn, .delete-btn, .undo-btn, .assign-btn, .fulfill-btn { width: 100%; }
+            .action-buttons { flex-direction: column; width: 100%; gap: 5px; }
+            .assign-select { width: 100%; }
+            .app-footer { justify-content: center; text-align: center; flex-direction: column; }
+            .filter-buttons, .filter-btn { flex-direction: column; width: 100%; }
+            .fab-container { bottom: 20px; right: 20px; gap: 10px; }
+            .sub-tab { font-size: 0.8rem; padding: 10px 5px; }
+            .notification-panel { right: 10px; width: calc(100% - 20px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useContext, createContext, useRef } = React;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC_DpYvpxImZ9EYp1Gfeh7Mi2E7SSZnhPE",
+            authDomain: "mandel-chores.firebaseapp.com",
+            projectId: "mandel-chores",
+            storageBucket: "mandel-chores.appspot.com",
+            messagingSenderId: "14121550108",
+            appId: "1:14121550108:web:95bd14610e8032ce57fad9",
+            measurementId: "G-BC16YJ8DGJ"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const messaging = firebase.messaging();
+        const functions = firebase.functions();
+
+        const setupNotifications = async (user) => {
+            try {
+                if ('serviceWorker' in navigator) { 
+                    await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+                }
+                const permission = await Notification.requestPermission();
+                if (permission === "granted") {
+                    await navigator.serviceWorker.ready;
+                    const token = await messaging.getToken();
+                    await db.collection("users").doc(user.uid).update({ fcmToken: token });
+                }
+            } catch (error) { console.error("An error occurred while setting up notifications.", error); }
+        };
+
+        const getStartOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
+        
+        const generateRecurringChores = async (firestoreDb, familyId) => {
+            if(!familyId) return;
+            const now = new Date();
+            const today = getStartOfDay(now);
+            const lastCheckKey = `lastRecurringGenerationCheck_${familyId}`;
+            const lastGenerationCheck = localStorage.getItem(lastCheckKey);
+            if (lastGenerationCheck && getStartOfDay(new Date(lastGenerationCheck)).getTime() === today.getTime()) { return; }
+            if (now.getHours() < 8) { return; }
+            
+            const recurringChoresRef = firestoreDb.collection("recurring_chores")
+              .where("familyId", "==", familyId);
+            const choresRef = firestoreDb.collection("chores");
+            try {
+                const snapshot = await recurringChoresRef.get();
+                const batch = firestoreDb.batch();
+                let choresGeneratedCount = 0;
+
+                for (const doc of snapshot.docs) {
+                    const recurringChore = { id: doc.id, ...doc.data() };
+                    let shouldGenerate = false;
+                    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                    const currentDayName = daysOfWeek[now.getDay()];
+
+                    switch (recurringChore.frequency) {
+                        case "daily": shouldGenerate = true; break;
+                        case "weekly": if (currentDayName === recurringChore.dayOfWeek) { shouldGenerate = true; } break;
+                        case "monthly": if (now.getDate() === recurringChore.dayOfMonth) { shouldGenerate = true; } break;
+                        case "pickDays": if (recurringChore.pickedDays && recurringChore.pickedDays.includes(currentDayName)) { shouldGenerate = true; } break;
+                    }
+
+                    if (shouldGenerate) {
+                        const existingIncompleteQuery = choresRef
+                            .where("recurringTemplateId", "==", recurringChore.id)
+                            .where("familyId", "==", familyId)
+                            .where("isComplete", "==", false);
+                        
+                        const incompleteSnapshot = await existingIncompleteQuery.get();
+
+                        if (!incompleteSnapshot.empty) {
+                            console.log(`Skipping generation for "${recurringChore.title}" because an incomplete version already exists.`);
+                            continue; 
+                        }
+                        
+                        const newChore = {
+                            ...recurringChore,
+                            isComplete: false,
+                            isRecurring: true,
+                            recurringTemplateId: recurringChore.id,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        delete newChore.id;
+                        batch.set(choresRef.doc(), newChore);
+                        choresGeneratedCount++;
+                    }
+                }
+                if (choresGeneratedCount > 0) { 
+                    await batch.commit(); 
+                    console.log(`${choresGeneratedCount} recurring chores generated for family ${familyId}.`);
+                }
+                localStorage.setItem(lastCheckKey, now.toISOString());
+            } catch (error) { console.error("Error generating recurring chores:", error); }
+        };
+
+        const AuthContext = createContext(null);
+
+        const AuthProvider = ({ children }) => {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [familyMembers, setFamilyMembers] = useState([]);
+            const [familyData, setFamilyData] = useState(null);
+            const notificationsInitialized = useRef(false);
+
+            useEffect(() => {
+                const unsubscribeAuth = auth.onAuthStateChanged(firebaseUser => {
+                    setUser(firebaseUser);
+                    notificationsInitialized.current = false;
+                    if (firebaseUser) {
+                        const userRef = db.collection("users").doc(firebaseUser.uid);
+                        const unsubscribeUserDoc = userRef.onSnapshot(docSnap => {
+                            if (docSnap.exists) {
+                                const data = docSnap.data();
+                                setUserData(data);
+                                if(data.familyId){
+                                    generateRecurringChores(db, data.familyId);
+                                }
+                                if (!notificationsInitialized.current) {
+                                    setupNotifications(firebaseUser);
+                                    notificationsInitialized.current = true;
+                                }
+                            } else {
+                                userRef.set({ 
+                                    points: 0, 
+                                    email: firebaseUser.email, 
+                                    displayName: (firebaseUser.displayName || firebaseUser.email.split("@")[0]),
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    notificationPreferences: {
+                                        newUnassignedChore: true,
+                                        choreAssignedToMe: true,
+                                        rewardRedeemed: true,
+                                        rewardFulfilled: true,
+                                    },
+                                });
+                            }
+                            setLoading(false);
+                        });
+                        return () => unsubscribeUserDoc();
+                    } else { 
+                        setUserData(null);
+                        setLoading(false);
+                    }
+                });
+                return () => unsubscribeAuth();
+            }, []);
+
+            useEffect(() => {
+                if(userData && userData.familyId){
+                     const unsubscribe = db.collection("users").where("familyId", "==", userData.familyId).onSnapshot(snapshot => {
+                        const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })); 
+                        setFamilyMembers(members);
+                    });
+                    return () => unsubscribe();
+                } else {
+                    setFamilyMembers([]);
+                }
+            }, [userData]);
+
+            useEffect(() => {
+                if (userData && userData.familyId) {
+                    const familyRef = db.collection("families").doc(userData.familyId);
+                    const unsubscribe = familyRef.onSnapshot(doc => {
+                        if (doc.exists) {
+                            setFamilyData({ id: doc.id, ...doc.data() });
+                        } else {
+                            setFamilyData(null);
+                        }
+                    });
+                    return () => unsubscribe();
+                } else {
+                    setFamilyData(null);
+                }
+            }, [userData]);
+
+
+            if (loading) { return <div className="auth-container"><div className="auth-box">Loading...</div></div>; }
+            
+            if (user && !userData) { return <div className="auth-container"><div className="auth-box">Loading user data...</div></div>; }
+            
+            if (user && userData && !userData.familyId) {
+                return <FamilySetup user={user} />;
+            }
+
+            return ( <AuthContext.Provider value={{ user, userData, familyMembers, familyData }}>{children}</AuthContext.Provider> );
+        };
+        
+        const FamilySetup = ({ user }) => {
+            const [familyName, setFamilyName] = useState("");
+            const [feedback, setFeedback] = useState({ type: "", message: "" });
+
+            const showFeedback = (type, message) => {
+                setFeedback({ type, message });
+                setTimeout(() => setFeedback({ type: "", message: "" }), 4000);
+            };
+
+            const handleCreateFamily = async (e) => {
+                e.preventDefault();
+                if (!familyName.trim()) {
+                    showFeedback("error", "Please enter a family name.");
+                    return;
+                }
+
+                try {
+                    const createFamily = functions.httpsCallable("createFamily");
+                    await createFamily({ familyName: familyName.trim() });
+                } catch (error) {
+                    console.error("Error creating family:", error);
+                    showFeedback("error", error.message || "Could not create family.");
+                }
+            };
+
+            return (
+                 <div className="auth-container">
+                    <div className="auth-box">
+                        <h2>Welcome!</h2>
+                        <p>You're one step away from a cleaner house and a happier family. Chore Tracker helps you assign, track, and reward chores to build good habits and make home life more peaceful (and fun!).</p>
+                        <p>To get started, create a family to share and manage chores.</p>
+                        <form onSubmit={handleCreateFamily} className="auth-form">
+                            <input type="text" placeholder="Enter Your Family Name" value={familyName} onChange={(e) => setFamilyName(e.target.value)} required />
+                            <button type="submit">Create Family</button>
+                            {feedback.message && <p style={{ color: feedback.type === "error" ? "red" : "green", fontSize: "0.9rem" }}>{feedback.message}</p>}
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+
+        const LoginSignup = () => {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState("");
+            const [password, setPassword] = useState("");
+            const [error, setError] = useState("");
+            const [pendingCred, setPendingCred] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError("");
+                try {
+                    if (isLogin) { 
+                        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                        if (pendingCred) {
+                           await userCredential.user.linkWithCredential(pendingCred);
+                           setPendingCred(null); 
+                        }
+                    } 
+                    else {
+                        const inviteQuery = await db.collection("invites").where("email", "==", email.toLowerCase()).limit(1).get();
+                        if (inviteQuery.empty) { setError("This email has not been invited."); return; }
+                        
+                        const { user } = await auth.createUserWithEmailAndPassword(email, password);
+                        
+                        const invite = inviteQuery.docs[0].data();
+                        
+                        await db.collection("users").doc(user.uid).set({ 
+                            points: 0, 
+                            email: user.email, 
+                            displayName: (user.email.split("@")[0]),
+                            familyId: invite.familyId,
+                            role: "child",
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            notificationPreferences: {
+                                newUnassignedChore: true,
+                                choreAssignedToMe: true,
+                                rewardRedeemed: true,
+                                rewardFulfilled: true,
+                            },
+                        });
+                        await db.collection("invites").doc(inviteQuery.docs[0].id).delete();
+                    }
+                } catch (err) { setError(err.message); }
+            };
+
+            const handleGoogleSignIn = async () => {
+                setError("");
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try {
+                    await auth.signInWithPopup(provider);
+                } catch (err) {
+                    if (err.code === "auth/account-exists-with-different-credential") {
+                        setPendingCred(err.credential);
+                        setEmail(err.customData.email);
+                        setError("This email is already associated with an account. Please sign in with your password to link your Google Account.");
+                    } else {
+                        setError(err.message);
+                    }
+                }
+            };
+
+            return (
+                <div className="auth-container">
+                    <div className="auth-box">
+                        <h2>{isLogin ? "Login" : "Sign Up"}</h2>
+                        <button onClick={handleGoogleSignIn} className="google-btn">
+                            <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                            <span>Sign in with Google</span>
+                        </button>
+                        <div className="auth-divider">OR</div>
+                        <form onSubmit={handleSubmit} className="auth-form">
+                            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                            <button type="submit">{isLogin ? "Login" : "Sign Up"}</button>
+                            {error && <p style={{ color: "red", fontSize: "0.9rem" }}>{error}</p>}
+                            <p className="auth-toggle" onClick={() => setIsLogin(!isLogin)}>{isLogin ? "Need an account? Sign Up" : "Already have an account? Login"}</p>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+        
+        const ActivityFeedPage = () => {
+            const { userData, familyMembers } = useContext(AuthContext);
+            const [activities, setActivities] = useState([]);
+            const [feedback, setFeedback] = useState({ type: "", message: "" });
+            const [undoneActivityIds, setUndoneActivityIds] = useState([]);
+
+            const showFeedback = (type, message) => {
+                setFeedback({ type, message });
+                setTimeout(() => setFeedback({ type: "", message: "" }), 3000);
+            };
+
+            useEffect(() => {
+                if (!userData || !familyMembers || familyMembers.length === 0) return;
+                
+                const fetchActivityFeed = async () => {
+                    try {
+                        const getActivityFeed = functions.httpsCallable("getActivityFeed");
+                        const result = await getActivityFeed();
+                        const feedItems = result.data.activities.map(item => {
+                            const member = familyMembers.find(m => m.uid === item.userId);
+                            return {
+                                ...item,
+                                userDisplayName: member ? member.displayName : item.userDisplayName,
+                                timestamp: item.timestamp ? new Date(item.timestamp) : null,
+                            };
+                        });
+                        setActivities(feedItems);
+                    } catch (error) {
+                        console.error("Error fetching activity feed:", error);
+                        showFeedback("error", "Could not load activity feed.");
+                    }
+                };
+
+                fetchActivityFeed();
+            }, [userData, familyMembers]);
+
+            const handleUndoComplete = async (activity) => {
+                if (undoneActivityIds.includes(activity.id) || userData.role !== "parent") return;
+
+                try {
+                    const undoChoreCompletion = functions.httpsCallable("undoChoreCompletion");
+                    const result = await undoChoreCompletion({ 
+                        choreId: activity.details.choreId,
+                        completedByUid: activity.userId,
+                        points: activity.details.points,
+                        activityId: activity.id,
+                     });
+
+                    if (result.data.success) {
+                        showFeedback("success", "Chore completion successfully undone!");
+                        setUndoneActivityIds(prev => [...prev, activity.id]);
+                    } else {
+                        throw new Error(result.data.error || "Failed to undo chore.");
+                    }
+                } catch (error) {
+                    console.error("Error calling undoChoreCompletion function:", error);
+                    showFeedback("error", error.message || "An unknown error occurred.");
+                }
+            };
+            
+            const handleUndoPurchase = async (activity) => {
+                if (userData.role !== "parent") return;
+
+                try {
+                    const undoRewardPurchase = functions.httpsCallable("undoRewardPurchase");
+                    const result = await undoRewardPurchase({
+                        rewardId: activity.details.rewardId,
+                        redeemedByUid: activity.userId,
+                        cost: activity.details.itemCost,
+                        activityId: activity.id,
+                    });
+
+                    if (result.data.success) {
+                        showFeedback("success", "Reward redemption successfully undone!");
+                    } else {
+                        throw new Error(result.data.error || "Failed to undo purchase.");
+                    }
+                } catch (error) {
+                    console.error("Error calling undoRewardPurchase function:", error);
+                    showFeedback("error", error.message || "An unknown error occurred.");
+                }
+            };
+
+            const getIconForEvent = (eventType) => {
+                switch (eventType) {
+                    case "CHORE_COMPLETED": return "🏆";
+                    case "CHORE_ADDED": return "📝";
+                    case "REWARD_REDEEMED": return "🎁";
+                    case "REWARD_FULFILLED": return "🤝";
+                    case "REWARD_ADDED": return "🛍️";
+                    case "USER_JOINED": return "🎉";
+                    default: return "🔔";
+                }
+            };
+
+            const renderActivityText = (activity) => {
+                const { userDisplayName, eventType, details } = activity;
+                const name = <strong>{userDisplayName}</strong>;
+
+                switch (eventType) {
+                    case "CHORE_COMPLETED": return (
+                        <>
+                            {name} completed "{details.title}" and earned <strong>{details.points} points</strong>.
+                            {userData.role === "parent" && (
+                                <div className="activity-actions">
+                                    <button className="undo-btn" onClick={() => handleUndoComplete(activity)} disabled={undoneActivityIds.includes(activity.id)} > {undoneActivityIds.includes(activity.id) ? "Undone" : "Undo"} </button>
+                                </div>
+                            )}
+                        </>
+                    );
+                    case "CHORE_ADDED": return <>{name} added a new chore: "{details.title}".</>;
+                    case "REWARD_REDEEMED": return (
+                        <>
+                            {name} redeemed "{details.itemName}" for <strong>{details.itemCost} points</strong>.
+                            {userData.role === "parent" && (
+                                <div className="activity-actions">
+                                    <button className="undo-btn" onClick={() => handleUndoPurchase(activity)}>Undo</button>
+                                </div>
+                            )}
+                        </>
+                    );
+                    case "REWARD_FULFILLED": return <>{name} fulfilled the reward "{details.itemName}" for <strong>{details.purchasedBy}</strong>.</>;
+                    case "REWARD_ADDED": return <>{name} added a new reward to the marketplace: "{details.name}".</>;
+                    case "USER_JOINED": return <>A new member, <strong>{userDisplayName}</strong>, has joined the family!</>;
+                    default: return <>A new event occurred.</>;
+                }
+            };
+            
+            return (
+                <div>
+                    <h2 className="section-title">Family Activity Feed</h2>
+                     {feedback.message && ( <div className={`feedback-message ${feedback.type}`}>{feedback.message}</div> )}
+                    <ul className="activity-feed">
+                        {activities.length > 0 ? activities.map(activity => (
+                            <li key={activity.id} className="activity-item">
+                                <div className="activity-icon">{getIconForEvent(activity.eventType)}</div>
+                                <div className="activity-content">
+                                    <p>{renderActivityText(activity)}</p>
+                                    <div className="timestamp">
+                                        {activity.timestamp ? new Date(activity.timestamp).toLocaleString() : "Just now"}
+                                    </div>
+                                </div>
+                            </li>
+                        )) : <p className="no-tasks">No activity yet. Go complete a chore! 😴</p>}
+                    </ul>
+                </div>
+            );
+        };
+
+        const NotificationSettingsPage = () => {
+            const { user, userData } = useContext(AuthContext);
+            const [settings, setSettings] = useState(userData.notificationPreferences || {});
+            const [feedback, setFeedback] = useState("");
+
+            const handlePreferenceChange = async (key, value) => {
+                const newSettings = { ...settings, [key]: value };
+                setSettings(newSettings);
+
+                try {
+                    const userRef = db.collection("users").doc(user.uid);
+                    await userRef.update({ [`notificationPreferences.${key}`]: value });
+                    setFeedback("Settings saved!");
+                    setTimeout(() => setFeedback(""), 2000);
+                } catch (error) {
+                    console.error("Error updating notification settings:", error);
+                    setFeedback("Failed to save settings.");
+                }
+            };
+
+            return (
+                <div>
+                    <h2 className="section-title">Notification Settings</h2>
+                    <div className="form-section">
+                        <ul className="settings-list">
+                            <li className="settings-item">
+                                <div className="settings-item-label"><strong>New Chores</strong><span>When a new, unassigned chore is added.</span></div>
+                                <label className="toggle-switch"><input type="checkbox" checked={settings.newUnassignedChore} onChange={(e) => handlePreferenceChange("newUnassignedChore", e.target.checked)} /><span className="slider"></span></label>
+                            </li>
+                            <li className="settings-item">
+                                <div className="settings-item-label"><strong>Chore Assignments</strong><span>When a chore is assigned to you.</span></div>
+                                <label className="toggle-switch"><input type="checkbox" checked={settings.choreAssignedToMe} onChange={(e) => handlePreferenceChange("choreAssignedToMe", e.target.checked)} /><span className="slider"></span></label>
+                            </li>
+                            <li className="settings-item">
+                                <div className="settings-item-label"><strong>My Rewards Redeemed</strong><span>When someone redeems a reward you provided.</span></div>
+                                <label className="toggle-switch"><input type="checkbox" checked={settings.rewardRedeemed} onChange={(e) => handlePreferenceChange("rewardRedeemed", e.target.checked)} /><span className="slider"></span></label>
+                            </li>
+                            <li className="settings-item">
+                                <div className="settings-item-label"><strong>My Rewards Fulfilled</strong><span>When a reward you redeemed is fulfilled.</span></div>
+                                <label className="toggle-switch"><input type="checkbox" checked={settings.rewardFulfilled} onChange={(e) => handlePreferenceChange("rewardFulfilled", e.target.checked)} /><span className="slider"></span></label>
+                            </li>
+                        </ul>
+                    </div>
+                    {feedback && <p style={{textAlign: "center", color: "#6a0dad"}}>{feedback}</p>}
+                </div>
+            );
+        };
+
+        const LeaderboardPage = () => {
+            const { userData } = useContext(AuthContext);
+            const [leaderboardData, setLeaderboardData] = useState([]);
+            const [roomStats, setRoomStats] = useState({});
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                if(!userData) return;
+                const fetchLeaderboard = async () => {
+                    setLoading(true);
+                    try {
+                        const getLeaderboardData = functions.httpsCallable("getLeaderboardData");
+                        const result = await getLeaderboardData();
+                        setLeaderboardData(result.data.leaderboardData);
+                        setRoomStats(result.data.roomStats);
+                    } catch (error) {
+                        console.error("Error fetching leaderboard:", error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchLeaderboard();
+            }, [userData]);
+            
+            const getRoomCardStyle = (topUserDisplayName) => {
+                const topUser = leaderboardData.find(u => u.displayName === topUserDisplayName);
+                if (topUser && topUser.userColor) {
+                    return { backgroundColor: topUser.userColor, color: "white" };
+                }
+                return {}; 
+            };
+
+
+            if (loading) return <p>Loading leaderboard...</p>;
+
+            return (
+                <div>
+                    <h2 className="section-title">Leaderboard</h2>
+                    <div className="leaderboard-card">
+                        <div className="leaderboard-header"><h3>Top Performers</h3></div>
+                        <ul className="leaderboard-list">
+                            {leaderboardData.map((user, index) => (
+                                <li key={user.uid} className="leaderboard-item" style={{ flexWrap: "wrap" }}>
+                                    <div style={{ display: "flex", alignItems: "center", width: "100%", marginBottom: "10px" }}>
+                                        <div className="leaderboard-rank">#{index + 1}</div>
+                                        <div className="leaderboard-user"><strong>{user.displayName || user.email}</strong></div>
+                                    </div>
+                                    <div className="stats-grid" style={{ width: "100%", padding: "0", gridTemplateColumns: "repeat(2, 1fr)" }}>
+                                        <div className="stat-card"><h4>Total Points</h4><p>{user.totalPoints}</p></div>
+                                        <div className="stat-card"><h4>Current Points</h4><p>{user.currentPoints}</p></div>
+                                        <div className="stat-card"><h4>Avg Pts/Chore</h4><p>{user.avgPointsPerChore}</p></div>
+                                        <div className="stat-card"><h4>Avg Chores/Day</h4><p>{user.avgChoresPerDay}</p></div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="leaderboard-card">
+                        <div className="leaderboard-header"><h3>Room Dominance</h3></div>
+                        <div className="stats-grid">
+                            {Object.entries(roomStats).map(([room, data]) => {
+                                const cardStyle = getRoomCardStyle(data.topUser);
+                                const textStyle = { color: cardStyle.color || "#555" };
+
+                                return (
+                                    <div key={room} className="room-stat-card" style={cardStyle}>
+                                        <h4 style={textStyle}>
+                                            {room}
+                                            <span style={{opacity: 0.8, fontSize: "0.8rem"}}>({data.total} chores)</span>
+                                        </h4>
+                                        <p style={{...textStyle, fontSize: "1.2rem", fontWeight: "bold", marginTop: "10px" }}>{data.topUser || "No one"}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        const MyCompletedChoresPage = () => {
+            const { user, userData } = useContext(AuthContext);
+            const [completedChores, setCompletedChores] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                if (!user || !userData?.familyId) {
+                    setLoading(false);
+                    return;
+                };
+                setLoading(true);
+                const unsubscribe = db.collection("chores")
+                    .where("familyId", "==", userData.familyId)
+                    .where("isComplete", "==", true)
+                    .where("completedBy", "==", user.uid)
+                    .orderBy("completedAt", "desc")
+                    .onSnapshot(snapshot => {
+                        setCompletedChores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        setLoading(false);
+                    }, error => {
+                        console.error("Error fetching completed chores:", error);
+                        setLoading(false);
+                    });
+
+                return () => unsubscribe();
+            }, [user, userData]);
+
+            if (loading) return <p>Loading your completed chores...</p>;
+
+            return (
+                <div>
+                    <h2 className="section-title">My Completed Chores</h2>
+                    {completedChores.length > 0 ? (
+                        <ul className="list-group">
+                            {completedChores.map(chore => (
+                                <li key={chore.id} className="list-item">
+                                    <div className="item-details">
+                                        <h4>{chore.title}</h4>
+                                        <p>{chore.points} points earned</p>
+                                        {chore.completedAt && (<p>Completed on: {new Date(chore.completedAt.toDate()).toLocaleString()}</p>)}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : ( <p className="no-tasks">You haven't completed any chores yet. Get to it!</p> )}
+                </div>
+            );
+        };
+
+        const ChoresPage = ({ openChoreModal, showToast }) => {
+            const [activeSubTab, setActiveSubTab] = useState("assigned");
+            const { userData } = useContext(AuthContext);
+            const isParent = userData.role === "parent";
+            
+            const renderChoresContent = () => {
+                const pageProps = { openChoreModal, isParent, showToast };
+                switch (activeSubTab) {
+                    case "unassigned": return <Chores {...pageProps} />;
+                    case "assigned": return <AssignedChores {...pageProps} />;
+                    case "recurring": return isParent ? <RecurringChoresManager {...pageProps} /> : <p>Only parents can manage recurring chores.</p>;
+                    default: return null;
+                }
+            };
+            return (
+                <div>
+                    <div className="sub-tab-bar">
+                        <div className={`sub-tab ${activeSubTab === "unassigned" ? "active" : ""}`} onClick={() => setActiveSubTab("unassigned")}>Unassigned</div>
+                        <div className={`sub-tab ${activeSubTab === "assigned" ? "active" : ""}`} onClick={() => setActiveSubTab("assigned")}>Assigned</div>
+                        {isParent && <div className={`sub-tab ${activeSubTab === "recurring" ? "active" : ""}`} onClick={() => setActiveSubTab("recurring")}>Recurring</div>}
+                    </div>
+                    <div>{renderChoresContent()}</div>
+                </div>
+            );
+        };
+        
+        const Chores = ({ openChoreModal, isParent, showToast }) => {
+            const { user, userData, familyMembers } = useContext(AuthContext);
+            const [chores, setChores] = useState([]);
+
+            useEffect(() => {
+                if(!userData.familyId) return;
+                const unsubscribe = db.collection("chores").where("familyId", "==", userData.familyId).where("isComplete", "==", false).where("assignedTo", "==", null).orderBy("createdAt", "desc")
+                    .onSnapshot(snapshot => { setChores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); });
+                return () => unsubscribe();
+            }, [userData.familyId]);
+            
+            const handleDeleteChore = async (choreId) => { if(isParent) await db.collection("chores").doc(choreId).delete(); };
+
+            const handleAssignChore = async (choreId, assignedToUid) => {
+                if(!isParent) return;
+                const member = familyMembers.find(m => m.uid === assignedToUid);
+                const updateData = assignedToUid ? { assignedTo: assignedToUid, assignedToDisplayName: member.displayName } : { assignedTo: null, assignedToDisplayName: null };
+                await db.collection("chores").doc(choreId).update(updateData);
+                showToast("success", "Chore assigned!");
+            };
+
+            const handleCompleteChore = async (chore) => {
+                const userRef = db.collection("users").doc(user.uid);
+                const choreRef = db.collection("chores").doc(chore.id);
+                try {
+                    await db.runTransaction(async (transaction) => {
+                        const userDoc = await transaction.get(userRef);
+                        const newPoints = (userDoc.data()?.points || 0) + chore.points;
+                        transaction.update(userRef, { points: newPoints });
+                        transaction.update(choreRef, { isComplete: true, completedBy: user.uid, completedByEmail: user.email, completedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    });
+                    showToast("success", "Chore completed!");
+                } catch (error) { 
+                    console.error("Transaction failed: ", error); 
+                    showToast("error", "Could not complete chore.");
+                }
+            };
+
+            return (
+                <div>
+                    <h3 className="section-title">Unassigned Chores</h3>
+                    {chores.length > 0 ? (
+                        <ul className="list-group">
+                            {chores.map(chore => (
+                                <li key={chore.id} className="list-item">
+                                    <div className="item-details">
+                                        <h4>{chore.title}</h4><p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
+                                    </div>
+                                    <div className="action-buttons">
+                                        {isParent && <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>}
+                                        {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore.id)}>Delete</button>}
+                                        {isParent && <select className="assign-select" value={chore.assignedTo || ""} onChange={(e) => handleAssignChore(chore.id, e.target.value)}><option value="">Assign To</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
+                                        <button className="complete-btn" onClick={() => handleCompleteChore(chore)}>Done</button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : ( <p className="no-tasks">No unassigned chores. Time to relax! 😴</p> )}
+                </div>
+            );
+        };
+
+        const AssignedChores = ({ openChoreModal, isParent, showToast }) => { 
+            const { user, userData, familyMembers } = useContext(AuthContext); 
+            const [assignedChores, setAssignedChores] = useState([]);
+            const [filter, setFilter] = useState("mine"); 
+
+            useEffect(() => {
+                if (!userData.familyId) return;
+                const unsubscribe = db.collection("chores")
+                    .where("familyId", "==", userData.familyId)
+                    .where("isComplete", "==", false)
+                    .where("assignedTo", "!=", null)
+                    .onSnapshot(snapshot => {
+                        const chores = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        chores.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+                        setAssignedChores(chores);
+                });
+                return () => unsubscribe();
+            }, [userData.familyId]);
+
+            const handleCompleteChore = async (chore) => {
+                const userRef = db.collection("users").doc(user.uid); 
+                const choreRef = db.collection("chores").doc(chore.id);
+                await db.runTransaction(async (transaction) => {
+                    const userDoc = await transaction.get(userRef);
+                    const newPoints = (userDoc.data()?.points || 0) + chore.points;
+                    transaction.update(userRef, { points: newPoints });
+                    transaction.update(choreRef, { isComplete: true, completedBy: user.uid, completedByEmail: user.email, completedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                });
+                showToast("success", "Chore completed!");
+            };
+
+            const handleDeleteChore = async (choreId) => { if(isParent) await db.collection("chores").doc(choreId).delete(); };
+            
+            const handleReassignChore = async (choreId, assignedToUid) => {
+                if(!isParent) return;
+                const member = familyMembers.find(m => m.uid === assignedToUid);
+                const updateData = assignedToUid ? { assignedTo: assignedToUid, assignedToDisplayName: member.displayName } : { assignedTo: null, assignedToDisplayName: null };
+                await db.collection("chores").doc(choreId).update(updateData);
+                showToast("success", "Chore reassigned!");
+            };
+
+            const filteredChores = assignedChores.filter(chore => {
+                if (filter === "all") return true; if (filter === "mine") return chore.assignedTo === user.uid; if (filter === "other") return chore.assignedTo !== user.uid; return true;
+            });
+
+            return (
+                <div>
+                    <h3 className="section-title">Assigned Chores</h3>
+                    <div className="filter-buttons">
+                        <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All</button>
+                        <button className={`filter-btn ${filter === "mine" ? "active" : ""}`} onClick={() => setFilter("mine")}>Mine</button>
+                        <button className={`filter-btn ${filter === "other" ? "active" : ""}`} onClick={() => setFilter("other")}>Others</button>
+                    </div>
+                    <ul className="list-group">
+                        {filteredChores.map(chore => (
+                            <li key={chore.id} className="list-item">
+                                <div className="item-details">
+                                    <h4>{chore.title}</h4>
+                                    <p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
+                                    <p>Assigned to: {chore.assignedToDisplayName}</p> 
+                                </div>
+                                <div className="action-buttons">
+                                    {isParent && <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>}
+                                    {isParent && <button className="delete-btn" onClick={() => handleDeleteChore(chore.id)}>Delete</button>}
+                                    {isParent && <select className="assign-select" value={chore.assignedTo} onChange={(e) => handleReassignChore(chore.id, e.target.value)}><option value="">Unassign</option>{familyMembers.map(m => (<option key={m.uid} value={m.uid}>{m.displayName}</option>))}</select>}
+                                    {chore.assignedTo === user.uid && <button className="complete-btn" onClick={() => handleCompleteChore(chore)}>Done</button>} 
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    {filteredChores.length === 0 && (<p className="no-tasks">No chores match the current filter. 😴</p>)}
+                </div>
+            );
+        };
+        
+        const RewardsPage = () => {
+            const { userData } = useContext(AuthContext);
+            const isParent = userData.role === "parent";
+            const [activeSubTab, setActiveSubTab] = useState("marketplace");
+            
+            const renderRewardsContent = () => {
+                switch (activeSubTab) {
+                    case "marketplace": return <Marketplace isParent={isParent} />;
+                    case "unfulfilled": return <UnfulfilledRewards isParent={isParent} />;
+                    case "fulfilled": return <RedeemedLog />;
+                    default: return null;
+                }
+            };
+            return (
+                <div>
+                    <div className="sub-tab-bar">
+                        <div className={`sub-tab ${activeSubTab === "marketplace" ? "active" : ""}`} onClick={() => setActiveSubTab("marketplace")}>Marketplace</div>
+                        <div className={`sub-tab ${activeSubTab === "unfulfilled" ? "active" : ""}`} onClick={() => setActiveSubTab("unfulfilled")}>My Rewards</div>
+                        <div className={`sub-tab ${activeSubTab === "fulfilled" ? "active" : ""}`} onClick={() => setActiveSubTab("fulfilled")}>History</div>
+                    </div>
+                    <div>{renderRewardsContent()}</div>
+                </div>
+            );
+        };
+
+        const Marketplace = ({ isParent }) => {
+            const { user, userData } = useContext(AuthContext); 
+            const [items, setItems] = useState([]);
+            
+            useEffect(() => {
+                if(!userData.familyId) return;
+                const unsubscribe = db.collection("marketplace_items").where("familyId", "==", userData.familyId).orderBy("cost", "asc").onSnapshot(snapshot => {
+                    setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, [userData.familyId]);
+
+            const handlePurchase = async (item) => {
+                const userRef = db.collection("users").doc(user.uid); 
+                await db.runTransaction(async (transaction) => {
+                    const userDoc = await transaction.get(userRef);
+                    if (!userDoc.exists || (userDoc.data()?.points || 0) < item.cost) { throw new Error("Not enough points!"); }
+                    const newPoints = (userDoc.data().points || 0) - item.cost;
+                    transaction.update(userRef, { points: newPoints });
+                    const purchasedRewardRef = db.collection("purchased_rewards").doc();
+                    transaction.set(purchasedRewardRef, { 
+                        ...item, // copy all fields
+                        purchasedBy: user.uid,
+                        purchasedByDisplayName: userData.displayName, 
+                        purchasedAt: firebase.firestore.FieldValue.serverTimestamp(), 
+                        isFulfilled: false,
+                        fulfilledAt: null, 
+                    });
+                    transaction.delete(db.collection("marketplace_items").doc(item.id));
+                });
+            };
+            
+            const handleDelete = async (itemId) => { if(isParent) await db.collection("marketplace_items").doc(itemId).delete(); };
+
+            return (
+                <div>
+                    <h3 className="section-title">Marketplace</h3>
+                    <ul className="list-group">
+                        {items.map(item => (
+                            <li key={item.id} className="list-item">
+                                <div className="item-details">
+                                    <h4>{item.name}</h4><p>{item.description}</p><p>{item.cost} points</p>
+                                    <p>Provided by: {item.providerDisplayName}</p>
+                                </div>
+                                <div className="action-buttons">
+                                    <button className="redeem-btn" onClick={() => handlePurchase(item)} disabled={userData.points < item.cost}>Redeem</button>
+                                    {isParent && user.uid === item.providerId && ( <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button> )}
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    {items.length === 0 && <p className="no-tasks">No items in the marketplace yet.</p>}
+                </div>
+            );
+        };
+        
+        const UnfulfilledRewards = ({ isParent }) => {
+            const { user, userData } = useContext(AuthContext);
+            const [rewards, setRewards] = useState([]);
+
+            useEffect(() => {
+                if(!userData.familyId) return;
+                const unsubscribe = db.collection("purchased_rewards").where("familyId", "==", userData.familyId).where("isFulfilled", "==", false).orderBy("purchasedAt", "desc")
+                    .onSnapshot(snapshot => setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+                return () => unsubscribe();
+            }, [userData.familyId]);
+
+            const handleFulfill = async (rewardId) => {
+                await db.collection("purchased_rewards").doc(rewardId).update({ isFulfilled: true, fulfilledAt: firebase.firestore.FieldValue.serverTimestamp() }); 
+            };
+            
+            return (
+                <div>
+                    <h3 className="section-title" style={{marginTop: "30px"}}>Rewards to Fulfill</h3>
+                     <ul className="list-group">
+                        {rewards.filter(r => r.providerId === user.uid).map(reward => (
+                            <li key={reward.id} className="list-item">
+                                <div className="item-details">
+                                    <h4>{reward.name}</h4><p>{reward.description}</p><p>{reward.cost} points</p>
+                                    <p>Redeemed by: {reward.purchasedByDisplayName}</p>
+                                </div>
+                                <div className="action-buttons"><button className="fulfill-btn" onClick={() => handleFulfill(reward.id)}>Mark as Fulfilled</button></div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            );
+        };
+
+        const RecurringChoresManager = ({ openChoreModal }) => {
+            const { userData } = useContext(AuthContext); 
+            const [recurringChores, setRecurringChores] = useState([]);
+            
+            useEffect(() => { 
+                if (!userData.familyId) return; 
+                const unsubscribe = db.collection("recurring_chores").where("familyId", "==", userData.familyId).orderBy("createdAt", "desc").onSnapshot(snapshot => { 
+                    setRecurringChores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
+                }); 
+                return () => unsubscribe(); 
+            }, [userData.familyId]);
+
+            const handleDeleteClick = async (choreId) => { 
+                await db.collection("recurring_chores").doc(choreId).delete(); 
+                const choresToDeleteSnapshot = await db.collection("chores").where("recurringTemplateId", "==", choreId).where("isComplete", "==", false).get(); 
+                const batch = db.batch(); 
+                choresToDeleteSnapshot.docs.forEach(doc => batch.delete(doc.ref)); 
+                await batch.commit(); 
+            };
+            
+            const getFrequencyDetails = (chore) => { if (chore.frequency === "weekly") return `Weekly on ${chore.dayOfWeek}`; if (chore.frequency === "monthly") return `Monthly on day ${chore.dayOfMonth}`; if (chore.frequency === "pickDays") return `On ${chore.pickedDays.join(", ")}`; return chore.frequency; };
+
+            return (
+                <div>
+                    <h3 className="section-title">Recurring Chore Templates</h3>
+                    {recurringChores.map(chore => ( 
+                        <li key={chore.id} className="list-item">
+                            <div className="item-details">
+                                <h4>{chore.title}</h4>
+                                <p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
+                                <p>Frequency: {getFrequencyDetails(chore)}</p>
+                                {chore.assignedToDisplayName && <p>Assigned to: {chore.assignedToDisplayName}</p>}
+                            </div>
+                            <div className="action-buttons">
+                                <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>
+                                <button className="delete-btn" onClick={() => handleDeleteClick(chore.id)}>Delete</button>
+                            </div>
+                        </li>
+                    ))}
+                    {recurringChores.length === 0 && <p className="no-tasks">No recurring chores defined yet.</p>}
+                </div>
+            );
+        };
+        
+        const RedeemedLog = () => {
+            const { userData } = useContext(AuthContext);
+            const [log, setLog] = useState([]);
+            useEffect(() => { 
+                if(!userData.familyId) return;
+                const unsubscribe = db.collection("purchased_rewards").where("familyId", "==", userData.familyId).where("isFulfilled", "==", true).orderBy("fulfilledAt", "desc").onSnapshot(snapshot => { setLog(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }); return () => unsubscribe(); 
+            }, [userData.familyId]);
+            return (
+                <div>
+                    <h3 className="section-title">Fulfilled Rewards Log</h3>
+                    <ul className="list-group">
+                        {log.map(entry => (
+                            <li key={entry.id} className="list-item">
+                                <div className="item-details">
+                                    <h4>{entry.name}</h4><p>{entry.description}</p><p>{entry.cost} points</p>
+                                    <p>Redeemed by: <strong>{entry.purchasedByDisplayName}</strong></p>
+                                    <p>Provided / Fulfilled by: <strong>{entry.providerDisplayName}</strong> on {entry.fulfilledAt?.toDate().toLocaleDateString()}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    {log.length === 0 && <p className="no-tasks">No fulfilled rewards yet.</p>}
+                </div>
+            );
+        };
+
+        const ProfilePage = ({ showToast }) => {
+            const { user, userData, familyMembers, familyData } = useContext(AuthContext); 
+            const [displayName, setDisplayName] = useState(userData.displayName || ""); 
+            const [newPassword, setNewPassword] = useState(""); 
+            const [inviteEmail, setInviteEmail] = useState(""); 
+            const [selectedColor, setSelectedColor] = useState(userData.userColor || "");
+            const [familyName, setFamilyName] = useState(familyData ? familyData.name : "");
+            const isParent = userData.role === "parent";
+
+            useEffect(() => {
+                if (familyData) {
+                    setFamilyName(familyData.name);
+                }
+            }, [familyData]);
+            
+            const handleUpdateProfile = async (e) => {
+                e.preventDefault();
+                try {
+                    await db.collection("users").doc(user.uid).update({ 
+                        displayName: displayName.trim(),
+                        userColor: selectedColor,
+                    }); 
+                    showToast("success", "Profile updated!"); 
+                } catch (error) { 
+                    showToast("error", error.message); 
+                }
+            };
+
+            const handleChangePassword = async (e) => { 
+                e.preventDefault(); 
+                if (newPassword.length < 6) { 
+                    showToast("error", "Password must be at least 6 characters."); 
+                    return; 
+                } 
+                try { 
+                    await user.updatePassword(newPassword); 
+                    setNewPassword(""); 
+                    showToast("success", "Password changed!"); 
+                } catch (error) { 
+                    showToast("error", error.message); 
+                } 
+            };
+
+            const handleSendInvite = async (e) => {
+                e.preventDefault(); if (!inviteEmail.trim() || !isParent) return;
+                try {
+                    await db.collection("invites").add({ email: inviteEmail.toLowerCase(), familyId: userData.familyId, invitedBy: user.uid, invitedByEmail: user.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    setInviteEmail(""); 
+                    showToast("success", `Invitation sent to ${inviteEmail}!`);
+                } catch (error) { 
+                    showToast("error", error.message); 
+                }
+            };
+            
+             const handleRoleChange = async (uid, newRole) => {
+                if (isParent && uid !== user.uid) { // Parents can't change their own role
+                    await db.collection("users").doc(uid).update({ role: newRole });
+                    showToast("success", "Member role updated!");
+                }
+            };
+
+            const handleUpdateFamilyName = async (e) => {
+                e.preventDefault();
+                if (!familyName.trim() || !isParent) return;
+                try {
+                    await db.collection("families").doc(userData.familyId).update({
+                        name: familyName.trim()
+                    });
+                    showToast("success", "Family name updated!");
+                } catch (error) {
+                    showToast("error", "Could not update family name.");
+                    console.error("Error updating family name:", error);
+                }
+            };
+    
+            const handleSendReminder = async (memberId) => {
+                showToast("success", "Sending reminder...");
+                try {
+                    const sendChoreReminderToUser = functions.httpsCallable("sendChoreReminderToUser");
+                    const result = await sendChoreReminderToUser({ userIdToRemind: memberId });
+                    showToast("success", result.data.message);
+                } catch (error) {
+                    console.error("Error sending reminder:", error);
+                    showToast("error", error.message || "Failed to send reminder.");
+                }
+            };
+            
+            const colors = ["#006D75", "#E0218A", "#FF6B6B", "#4ECDC4", "#45B7D1", "#F7D16A", "#FFA07A", "#98D8C8", "#8260C2", "#57E2E5"];
+            return (
+                <div>
+                    <h2 className="section-title">My Profile</h2>
+                    <div className="form-section">
+                        <h3>Update Profile</h3>
+                        <form onSubmit={handleUpdateProfile}>
+                            <div className="input-group">
+                                <label>Display Name:</label>
+                                <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+                             </div>
+                            <div className="input-group">
+                                <label>My Color:</label>
+                                <li className="list-item">
+                                    <div className="color-palette">
+                                        {colors.map(color => (
+                                            <span
+                                                key={color}
+                                                className={`color-swatch${selectedColor === color ? " selected" : ""}`}
+                                                style={{ backgroundColor: color }}
+                                                onClick={() => setSelectedColor(color)}
+                                            />
+                                        ))}
+                                    </div>
+                                </li>
+                                <li className="list-item">
+                                    <input 
+                                        type="color" 
+                                        value={selectedColor || "#ffffff"} 
+                                        onChange={(e) => setSelectedColor(e.target.value)}
+                                        style={{ padding: "0", height: "40px", width: "50px", border: "1px solid #ccc", borderRadius: "6px", cursor: "pointer" }}
+                                    />
+                                    <input 
+                                        type="text" 
+                                        value={selectedColor} 
+                                        onChange={(e) => setSelectedColor(e.target.value)}
+                                        placeholder="e.g. #6a0dad"
+                                    />
+                                </li>
+                            </div>
+                             <button type="submit" className="full-width-button">Update Profile</button>
+                        </form>
+                    </div>
+
+                    <div className="form-section"><h3>Change Password</h3><form onSubmit={handleChangePassword}><div className="input-group"><label>New Password:</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /><button type="submit">Change</button></div></form></div>
+                    {isParent && (
+                        <div className="form-section">
+                            <h3>Family Management</h3>
+                             <form onSubmit={handleUpdateFamilyName}>
+                                <div className="input-group">
+                                    <label>Family Name:</label>
+                                    <input type="text" value={familyName} onChange={(e) => setFamilyName(e.target.value)} required />
+                                    <button type="submit">Update</button>
+                                </div>
+                            </form>
+                            <ul className="list-group" style={{marginTop: "20px"}}>
+                                {familyMembers.map(member => (
+                                    <li key={member.uid} className="list-item">
+                                        <div className="item-details">
+                                            <span>{member.displayName} ({member.role})</span>
+                                        </div>
+                                        <div className="action-buttons" style={{flexDirection: "row", alignItems: "center"}}>
+                                            {member.role === "child" && <button className="assign-btn" style={{backgroundColor: "#ff9800"}} onClick={() => handleSendReminder(member.uid)}>Remind</button>}
+                                            <select className="assign-select" value={member.role} onChange={e => handleRoleChange(member.uid, e.target.value)} disabled={member.uid === user.uid}>
+                                                <option value="parent">Parent</option>
+                                                <option value="child">Child</option>
+                                            </select>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                            <form onSubmit={handleSendInvite} style={{marginTop: "20px"}}><div className="input-group"><label>Invite New Member:</label><input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required /><button type="submit">Send Invite</button></div></form>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        const FeedbackPage = () => {
+            const { userData } = useContext(AuthContext);
+            const [feedbackItems, setFeedbackItems] = useState([]);
+            const [editingItem, setEditingItem] = useState(null);
+            const [editText, setEditText] = useState("");
+            const [activeSubTab, setActiveSubTab] = useState("open");
+
+            useEffect(() => {
+                const unsubscribe = db.collection("feedback").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+                    setFeedbackItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, []);
+
+            const handleStatusChange = async (id, newStatus) => {
+                await db.collection("feedback").doc(id).update({ status: newStatus });
+            };
+
+            const handleDelete = async (id) => {
+                if (window.confirm("Are you sure you want to delete this feedback?")) {
+                    await db.collection("feedback").doc(id).delete();
+                }
+            };
+            
+            const handleEdit = (item) => {
+                setEditingItem(item);
+                setEditText(item.message || item.text);
+            };
+
+            const handleUpdate = async (e) => {
+                e.preventDefault();
+                if (!editText.trim()) return;
+                await db.collection("feedback").doc(editingItem.id).update({ message: editText });
+                setEditingItem(null);
+                setEditText("");
+            };
+            
+            const getStatusColor = (status) => {
+                switch (status) {
+                    case "new": return "#e7f3ff"; // soft light blue
+                    case "in-progress": return "#fff4e5"; // soft light orange
+                    case "done": return "#e8f5e9"; // soft light green
+                    case "WAI": return "#f7f9fc"; // default grey
+                    default: return "#f7f9fc";
+                }
+            };
+
+            const filteredItems = feedbackItems.filter(item => {
+                if (activeSubTab === "open") return ["new", "in-progress"].includes(item.status);
+                if (activeSubTab === "closed") return ["done", "WAI"].includes(item.status);
+                return true; // "all" tab
+            });
+
+            if (userData.role !== "parent") {
+                return <p className="p-4 text-center">You do not have permission to view this page.</p>;
+            }
+
+            return (
+                <div>
+                    <div className="sub-tab-bar">
+                        <div className={`sub-tab ${activeSubTab === "open" ? "active" : ""}`} onClick={() => setActiveSubTab("open")}>Open</div>
+                        <div className={`sub-tab ${activeSubTab === "all" ? "active" : ""}`} onClick={() => setActiveSubTab("all")}>All</div>
+                        <div className={`sub-tab ${activeSubTab === "closed" ? "active" : ""}`} onClick={() => setActiveSubTab("closed")}>Closed</div>
+                    </div>
+
+                    <ul className="list-group">
+                        {filteredItems.map(item => (
+                            <li key={item.id} className="list-item" style={{backgroundColor: getStatusColor(item.status)}}>
+                                <div className="item-details">
+                                    <p><strong>From:</strong> {item.userDisplayName || item.email || "Anonymous"} ({item.type})</p>
+                                    <p className="my-2">{item.message || item.text}</p>
+                                    <p className="text-xs text-gray-500">Submitted: {item.createdAt?.toDate().toLocaleString()}</p>
+                                </div>
+                                <div className="action-buttons">
+                                    <select value={item.status} onChange={(e) => handleStatusChange(item.id, e.target.value)} className="assign-select">
+                                        <option value="new">New</option>
+                                        <option value="in-progress">In-progress</option>
+                                        <option value="WAI">WAI</option>
+                                        <option value="done">Done</option>
+                                    </select>
+                                    <button className="edit-btn" onClick={() => handleEdit(item)}>Edit</button>
+                                    <button className="delete-btn" onClick={() => handleDelete(item.id)}>Delete</button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                     {filteredItems.length === 0 && <p className="no-tasks">No feedback items in this category.</p>}
+                    {editingItem && (
+                        <div className="modal-overlay" onClick={() => setEditingItem(null)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header"><h3>Edit Feedback</h3><button className="close-btn" onClick={() => setEditingItem(null)}>&times;</button></div>
+                                <form onSubmit={handleUpdate}>
+                                    <div className="input-group"><textarea value={editText} onChange={e => setEditText(e.target.value)} required rows="5" className="w-full"></textarea></div>
+                                    <button type="submit" className="full-width-button">Update Feedback</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        const FeedbackModal = ({ setIsOpen }) => {
+            const { user, userData } = useContext(AuthContext);
+            const [feedbackType, setFeedbackType] = useState("bug");
+            const [message, setMessage] = useState("");
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [submitStatus, setSubmitStatus] = useState({ state: "idle", text: "" });
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!message.trim() || !user || !userData) return;
+                setIsSubmitting(true);
+                try {
+                    await db.collection("feedback").add({
+                        type: feedbackType, 
+                        message, 
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        userId: user.uid, 
+                        email: user.email || "anonymous", 
+                        userDisplayName: userData.displayName, 
+                        userAgent: navigator.userAgent, 
+                        status: "new",
+                    });
+                    setSubmitStatus({ state: "success", text: "Feedback submitted!" });
+                    setTimeout(() => setIsOpen(false), 1500);
+                } catch (error) {
+                    console.error("Error submitting feedback:", error);
+                    setSubmitStatus({ state: "error", text: "Submission failed." });
+                } finally {
+                    setIsSubmitting(false);
+                }
+            };
+            
+            return (
+                <div className="modal-overlay" onClick={() => setIsOpen(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header"><h3>Submit Feedback</h3><button className="close-btn" onClick={() => setIsOpen(false)}>&times;</button></div>
+                        <form onSubmit={handleSubmit}>
+                            <div className="input-group" style={{marginBottom: "20px"}}>
+                                <div style={{display: "flex", gap: "10px", width: "100%"}}>
+                                    <button type="button" onClick={() => setFeedbackType("bug")} className={`filter-btn ${feedbackType === "bug" ? "active" : ""}`} style={{width: "50%"}}>🐛 Report a Bug</button>
+                                    <button type="button" onClick={() => setFeedbackType("suggestion")} className={`filter-btn ${feedbackType === "suggestion" ? "active" : ""}`} style={{width: "50%"}}>💡 Suggest an Idea</button>
+                                </div>
+                            </div>
+                            <div className="input-group"><textarea placeholder={feedbackType === "bug" ? "Please describe the bug..." : "What's your idea?"} value={message} onChange={e => setMessage(e.target.value)} required rows="5"></textarea></div>
+                            <button type="submit" className="full-width-button" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit"}</button>
+                            {submitStatus.state !== "idle" && (<p className={`feedback-message ${submitStatus.state}`}>{submitStatus.text}</p>)}
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const RewardModal = ({ isOpen, setIsOpen, showToast }) => {
+            const { user, userData } = useContext(AuthContext);
+            const [newItemName, setNewItemName] = useState("");
+            const [newItemDesc, setNewItemDesc] = useState("");
+            const [newItemCost, setNewItemCost] = useState(25);
+
+            const handleAddItem = async (e) => {
+                e.preventDefault();
+                if (!newItemName.trim() || !user || userData.role !== "parent") return;
+                try {
+                    await db.collection("marketplace_items").add({
+                        name: newItemName,
+                        description: newItemDesc,
+                        cost: parseInt(newItemCost),
+                        providerId: user.uid,
+                        providerDisplayName: userData.displayName,
+                        familyId: userData.familyId,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    setNewItemName("");
+                    setNewItemDesc("");
+                    setNewItemCost(25);
+                    setIsOpen(false);
+                    showToast("success", "New reward added to the marketplace!");
+                } catch (error) {
+                    console.error("Error adding reward:", error);
+                    showToast("error", "Could not add reward.");
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="modal-overlay" onClick={() => setIsOpen(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header"><h3>Add New Reward</h3><button className="close-btn" onClick={() => setIsOpen(false)}>&times;</button></div>
+                        <form onSubmit={handleAddItem}>
+                            <div className="input-group"><label>Name:</label><input type="text" value={newItemName} onChange={e => setNewItemName(e.target.value)} required /></div>
+                            <div className="input-group"><label>Description:</label><textarea value={newItemDesc} onChange={e => setNewItemDesc(e.target.value)} rows="2"></textarea></div>
+                            <div className="input-group"><label>Cost:</label><input type="number" min="1" value={newItemCost} onChange={e => setNewItemCost(e.target.value)} required /></div>
+                            <button type="submit" className="full-width-button">Add Reward</button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const { user, userData, familyMembers } = useContext(AuthContext);
+            if (!user || !userData) { return <LoginSignup />; }
+            
+            const [activeTab, setActiveTab] = useState("chores"); 
+            const [isMenuOpen, setMenuOpen] = useState(false);
+            const [notifications, setNotifications] = useState([]);
+            const [showNotifications, setShowNotifications] = useState(false);
+            const [isRewardModalOpen, setRewardModalOpen] = useState(false);
+            const [isFeedbackModalOpen, setFeedbackModalOpen] = useState(false);
+            const [toast, setToast] = useState({ message: "", type: "" });
+            
+            const notificationPanelRef = useRef(null);
+            const notificationBellRef = useRef(null);
+            
+            const isParent = userData.role === "parent";
+
+            const showToast = (type, message) => {
+                setToast({ type, message });
+                setTimeout(() => {
+                    setToast({ message: "", type: "" });
+                }, 3000);
+            };
+
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (showNotifications && notificationPanelRef.current && !notificationPanelRef.current.contains(event.target) && notificationBellRef.current && !notificationBellRef.current.contains(event.target)) {
+                        setShowNotifications(false);
+                    }
+                };
+                document.addEventListener("mousedown", handleClickOutside);
+                return () => document.removeEventListener("mousedown", handleClickOutside);
+            }, [showNotifications]);
+
+            useEffect(() => {
+                const unsubscribe = db.collection("notifications").where("recipientUid", "==", user.uid).orderBy("createdAt", "desc").limit(20)
+                    .onSnapshot(snapshot => { setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); });
+                
+                const unsubscribeMessaging = messaging.onMessage((payload) => { console.log("Foreground message received. ", payload); });
+                return () => { unsubscribe(); unsubscribeMessaging(); };
+            }, [user.uid]);
+
+            const unreadCount = notifications.filter(n => !n.isRead).length;
+
+            const handleBellClick = async () => {
+                const currentlyShowing = showNotifications;
+                setShowNotifications(!currentlyShowing);
+                if (!currentlyShowing && unreadCount > 0) {
+                    const batch = db.batch();
+                    notifications.forEach(notif => {
+                        if (!notif.isRead) {
+                            const notifRef = db.collection("notifications").doc(notif.id);
+                            batch.update(notifRef, { isRead: true });
+                        }
+                    });
+                    await batch.commit();
+                }
+            };
+
+            const handleClearNotifications = async () => {
+                if (notifications.length === 0) return;
+                const batch = db.batch();
+                notifications.forEach(notif => { batch.delete(db.collection("notifications").doc(notif.id)); });
+                try { await batch.commit(); } catch (error) { console.error("Error clearing notifications:", error); }
+            };
+
+            const [isChoreModalOpen, setChoreModalOpen] = useState(false);
+            const [editingChore, setEditingChore] = useState(null);
+            const [newChore, setNewChore] = useState("");
+            const [pointsValue, setPointsValue] = useState(10);
+            const [isRepeating, setIsRepeating] = useState(false);
+            const [frequency, setFrequency] = useState("daily");
+            const [dayOfWeek, setDayOfWeek] = useState("");
+            const [dayOfMonth, setDayOfMonth] = useState("");
+            const [assignedTo, setAssignedTo] = useState("");
+            const [pickedDays, setPickedDays] = useState([]);
+            const [room, setRoom] = useState("");
+
+            const resetFormAndCloseModal = () => {
+                setNewChore(""); setPointsValue(10); setIsRepeating(false); setFrequency("daily"); setDayOfWeek(""); setDayOfMonth(""); setAssignedTo(""); setEditingChore(null); setPickedDays([]); setRoom("");
+                setChoreModalOpen(false);
+            };
+
+            const openChoreModal = (choreToEdit = null) => {
+                if(!isParent) return;
+                if (choreToEdit) {
+                    setEditingChore(choreToEdit); setNewChore(choreToEdit.title); setPointsValue(choreToEdit.points); setIsRepeating(!!choreToEdit.frequency); setFrequency(choreToEdit.frequency || "daily"); setDayOfWeek(choreToEdit.dayOfWeek || ""); setDayOfMonth(choreToEdit.dayOfMonth || ""); setAssignedTo(choreToEdit.assignedTo || ""); setPickedDays(choreToEdit.pickedDays || []); setRoom(choreToEdit.room || "");
+                } else {
+                    setEditingChore(null); setNewChore(""); setPointsValue(10); setIsRepeating(false); setFrequency("daily"); setDayOfWeek(""); setDayOfMonth(""); setAssignedTo(""); setPickedDays([]); setRoom("");
+                }
+                setChoreModalOpen(true); setMenuOpen(false);
+            };
+            
+            const handleChoreSubmit = async (e) => {
+                e.preventDefault();
+                if (!newChore.trim() || !isParent) return;
+                
+                const selectedAssignee = familyMembers.find(u => u.uid === assignedTo);
+                const choreData = { 
+                    title: newChore,
+                    points: parseInt(pointsValue),
+                    room: room || null, 
+                    assignedTo: assignedTo || null, 
+                    assignedToEmail: selectedAssignee ? selectedAssignee.email : null,
+                    assignedToDisplayName: selectedAssignee ? selectedAssignee.displayName : null,
+                    addedBy: user.uid,
+                    addedByEmail: user.email, 
+                    familyId: userData.familyId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                };
+
+                const collectionName = isRepeating ? "recurring_chores" : "chores";
+                const docRef = editingChore ? db.collection(collectionName).doc(editingChore.id) : db.collection(collectionName).doc();
+
+                if (isRepeating) {
+                    Object.assign(choreData, { frequency, dayOfWeek, dayOfMonth, pickedDays });
+                } else {
+                     Object.assign(choreData, { isComplete: false, isRecurring: false });
+                }
+
+                try {
+                    if(editingChore){ 
+                        await docRef.update(choreData); 
+                        showToast("success", "Chore updated!");
+                    } else { 
+                        await docRef.set(choreData);
+                        showToast("success", "Chore added!");
+                    }
+                } catch (error) { 
+                    console.error(`Error saving chore:`, error);
+                    showToast("error", "Could not save chore.");
+                }
+                
+                resetFormAndCloseModal();
+            };
+            
+            const handleDayToggle = (day) => { setPickedDays(prevDays => prevDays.includes(day) ? prevDays.filter(d => d !== day) : [...prevDays, day]); };
+            const handleSignOut = async () => { try { await auth.signOut(); } catch (error) { console.error("Error signing out:", error); } };
+            const toggleMenu = () => setMenuOpen(!isMenuOpen);
+            const handleNavClick = (tabName) => { setActiveTab(tabName); setMenuOpen(false); };
+
+            const renderContent = () => {
+                const pageProps = { openChoreModal, showToast };
+                switch (activeTab) {
+                    case "chores": return <ChoresPage {...pageProps} />;
+                    case "my-completed": return <MyCompletedChoresPage />;
+                    case "rewards": return <RewardsPage />;
+                    case "leaderboard": return <LeaderboardPage />;
+                    case "activity": return <ActivityFeedPage />;
+                    case "notifications": return <NotificationSettingsPage />;
+                    case "feedback": return <FeedbackPage />;
+                    case "profile": return <ProfilePage showToast={showToast} />;
+                    default: return <ChoresPage {...pageProps} />;
+                }
+            };
+            
+            const navLinks = [ 
+                { id: "chores", label: "Chores" },
+                { id: "my-completed", label: "My Completed" }, 
+                { id: "rewards", label: "Rewards" },
+                { id: "leaderboard", label: "Leaderboard" }, 
+                { id: "activity", label: "Activity" },
+                { id: "notifications", label: "Settings" },
+                { id: "profile", label: "Profile" },
+            ];
+
+            const roomOptions = ["Kitchen", "Bedroom", "Bathroom", "Dining Room", "Upstairs Bathroom", "Upstairs Bedroom", "Backyard", "Living Room", "Alex's Office", "Back Bathroom", "Front Hallway"];
+            const daysOfWeekOptions = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+            return (
+                <>
+                    <div className={`sidenav ${isMenuOpen ? "open" : ""}`}>
+                        <div className="nav-links">
+                            {navLinks.map(link => (<a key={link.id} href="#" className={activeTab === link.id ? "active" : ""} onClick={() => handleNavClick(link.id)}>{link.label}</a>))}
+                            {isParent && <a key="feedback" href="#" className={activeTab === "feedback" ? "active" : ""} onClick={() => handleNavClick("feedback")}>Manage Feedback</a>}
+                        </div>
+                        {isParent && <div className="sidebar-action"><button className="full-width-button" onClick={() => openChoreModal()}>Create New Chore</button></div>}
+                    </div>
+                    <div className={`overlay ${isMenuOpen ? "visible" : ""}`} onClick={toggleMenu}></div>
+                    <div className="app-container">
+                        <header className="header">
+                            <button className="menu-btn" onClick={toggleMenu}><div className="bar"></div><div className="bar"></div><div className="bar"></div></button>
+                            <h1>Chore Tracker</h1>
+                            <div className="notification-bell" onClick={handleBellClick} ref={notificationBellRef}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+                                {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
+                            </div>
+                            <div className="header-points-box" onClick={() => handleNavClick("rewards")}><p>Points</p><h2>{userData.points}</h2></div>
+                        </header>
+                        {showNotifications && (
+                            <div className="notification-panel" ref={notificationPanelRef}>
+                                <div className="notification-list">
+                                    {notifications.length > 0 ? notifications.map(notif => ( <div key={notif.id} className="notification-item"><p>{notif.message}</p>{notif.createdAt && <small>{new Date(notif.createdAt.toDate()).toLocaleString()}</small>}</div> )) : <p className="no-notifications">No new notifications.</p>}
+                                </div>
+                                {notifications.length > 0 && ( <div className="notification-footer"><button className="clear-notifications-btn" onClick={handleClearNotifications}>Clear All</button></div> )}
+                            </div>
+                        )}
+                        <main className="content">{renderContent()}</main>
+                        <footer className="app-footer">
+                            <div className="user-info-footer"><p>Logged in as: <strong>{userData.displayName}</strong> ({userData.role})</p></div>
+                            <button onClick={handleSignOut}>Sign Out</button>
+                        </footer>
+                    </div>
+                    {isChoreModalOpen && (
+                        <div className="modal-overlay" onClick={resetFormAndCloseModal}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h3>{editingChore ? "Edit Chore" : "Add New Chore"}</h3>
+                                    <button className="close-btn" onClick={resetFormAndCloseModal}>&times;</button>
+                                </div>
+                                <form onSubmit={handleChoreSubmit}>
+                                    <div className="input-group"><label>Title:</label><input type="text" value={newChore} onChange={(e) => setNewChore(e.target.value)} required /></div>
+                                    <div className="input-group"><label>Points:</label><input type="number" min="1" value={pointsValue} onChange={(e) => setPointsValue(e.target.value)} required /></div>
+                                    <div className="input-group"><label>Room:</label><select value={room} onChange={(e) => setRoom(e.target.value)}><option value="">Select Room</option>{roomOptions.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                                    <div className="input-group"><label>Repeat?</label><div className="radio-group"><label><input type="radio" name="repeat" checked={!isRepeating} onChange={() => setIsRepeating(false)} /> No</label><label><input type="radio" name="repeat" checked={isRepeating} onChange={() => setIsRepeating(true)} /> Yes</label></div></div>
+                                    {isRepeating && (
+                                        <>
+                                            <div className="input-group"><label>Frequency:</label><select value={frequency} onChange={(e) => setFrequency(e.target.value)}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="pickDays">Pick Days</option></select></div>
+                                            {frequency === "weekly" && (<div className="input-group"><label>Day:</label><select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} required><option value="">Select Day</option>{daysOfWeekOptions.map(day => <option key={day} value={day}>{day}</option>)}</select></div>)}
+                                            {frequency === "monthly" && (<div className="input-group"><label>Day:</label><input type="number" min="1" max="31" value={dayOfMonth} onChange={(e) => setDayOfMonth(e.target.value)} required /></div>)}
+                                            {frequency === "pickDays" && (<div className="input-group"><label>Days:</label><div className="day-picker">{daysOfWeekOptions.map(day => (<div key={day}><input type="checkbox" id={`day-${day}`} checked={pickedDays.includes(day)} onChange={() => handleDayToggle(day)} /><label htmlFor={`day-${day}`}>{day.substring(0,3)}</label></div>))}</div></div>)}
+                                        </>
+                                    )}
+                                    <div className="input-group"><label>Assigned To:</label><select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}><option value="">Unassigned</option>{familyMembers.map(member => (<option key={member.uid} value={member.uid}>{member.displayName}</option>))}</select></div>
+                                    <button type="submit" className="full-width-button">{editingChore ? "Update Chore" : "Add Chore"}</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    {isFeedbackModalOpen && <FeedbackModal setIsOpen={setFeedbackModalOpen} />}
+                    {isParent && <RewardModal isOpen={isRewardModalOpen} setIsOpen={setRewardModalOpen} showToast={showToast} />}
+                    <div className="fab-container">
+                        <button className="fab feedback-fab" onClick={() => setFeedbackModalOpen(true)}>
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2v2zm0-4h-2V6h2v4z"/></svg>
+                        </button>
+                        {isParent && (
+                            <>
+                                <button className="fab add-reward-fab" onClick={() => { setMenuOpen(false); setRewardModalOpen(true); }}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M2.5.5A.5.5 0 0 1 3 .5h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536a3 3 0 1 1-1.133 5.89c-.79 1.865-1.878 2.777-2.833 3.011v2.173l1.425.356c.194.048.377.135.537.255L13.3 15.1a.5.5 0 0 1-.3.9H3a.5.5 0 0 1-.3-.9l1.838-1.379c.16-.12.343-.207.537-.255L6.5 13.11v-2.173c-.955-.234-2.043-1.146-2.833-3.012a3 3 0 1 1-1.132-5.89A33.076 33.076 0 0 1 2.5.5zm.099 2.54a2 2 0 0 0 .72 3.935c-.333-1.05-.588-2.346-.72-3.935zm10.083 3.935a2 2 0 0 0 .72-3.935c-.133 1.59-.388 2.885-.72 3.935z"/>
+                                    </svg>
+                                </button>
+                                <button className="fab add-chore-fab" onClick={() => openChoreModal()}>+</button>
+                            </>
+                        )}
+                    </div>
+                     {toast.message && (
+                        <div style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: "2000" }} className={`feedback-message ${toast.type === "success" ? "success" : "error"}`} >
+                            {toast.message}
+                        </div>
+                    )}
+                </>
+            );
+        };
+        
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<AuthProvider><App /></AuthProvider>);
+    </script>
+</body>
+</html>

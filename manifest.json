@@ -1,0 +1,22 @@
+{
+  "short_name": "Chores",
+  "name": "Our Chore Tracker",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/6a0dad/ffffff?text=Chores",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://placehold.co/512x512/6a0dad/ffffff?text=Chores",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#6a0dad",
+  "background_color": "#ffffff"
+}
