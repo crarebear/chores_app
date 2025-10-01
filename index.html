@@ -1530,7 +1530,7 @@
                 e.preventDefault();
                 if (!newItemName.trim() || !user || userData.role !== "parent") return;
                 try {
-                    await db.collection("marketplace_items").add({
+                    const docRef = await db.collection("marketplace_items").add({
                         name: newItemName,
                         description: newItemDesc,
                         cost: parseInt(newItemCost),
@@ -1543,7 +1543,9 @@
                     setNewItemDesc("");
                     setNewItemCost(25);
                     setIsOpen(false);
-                    showToast("success", "New reward added to the marketplace!");
+                    showToast("success", "New reward added!", () => {
+                        db.collection("marketplace_items").doc(docRef.id).delete();
+                    });
                 } catch (error) {
                     console.error("Error adding reward:", error);
                     showToast("error", "Could not add reward.");
@@ -1577,18 +1579,18 @@
             const [showNotifications, setShowNotifications] = useState(false);
             const [isRewardModalOpen, setRewardModalOpen] = useState(false);
             const [isFeedbackModalOpen, setFeedbackModalOpen] = useState(false);
-            const [toast, setToast] = useState({ message: "", type: "" });
+            const [toast, setToast] = useState({ message: "", type: "", onUndo: null });
             
             const notificationPanelRef = useRef(null);
             const notificationBellRef = useRef(null);
             
             const isParent = userData.role === "parent";
 
-            const showToast = (type, message) => {
-                setToast({ type, message });
+            const showToast = (type, message, undoCallback = null) => {
+                setToast({ type, message, onUndo: undoCallback });
                 setTimeout(() => {
-                    setToast({ message: "", type: "" });
-                }, 3000);
+                    setToast({ message: "", type: "", onUndo: null });
+                }, 5000);
             };
 
             useEffect(() => {
@@ -1692,8 +1694,10 @@
                         await docRef.update(choreData); 
                         showToast("success", "Chore updated!");
                     } else { 
-                        await docRef.set(choreData);
-                        showToast("success", "Chore added!");
+                        const newDoc = await docRef.set(choreData);
+                        showToast("success", "Chore added!", () => {
+                            docRef.delete();
+                        });
                     }
                 } catch (error) { 
                     console.error(`Error saving chore:`, error);
@@ -1814,8 +1818,13 @@
                         )}
                     </div>
                      {toast.message && (
-                        <div style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: "2000" }} className={`feedback-message ${toast.type === "success" ? "success" : "error"}`} >
-                            {toast.message}
+                        <div style={{ position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)", zIndex: "2000", display: "flex", alignItems: "center", gap: "15px" }} className={`feedback-message ${toast.type === "success" ? "success" : "error"}`} >
+                            <span>{toast.message}</span>
+                            {toast.onUndo && (
+                                <button onClick={toast.onUndo} style={{ fontWeight: "bold", background: "none", border: "none", cursor: "pointer", color: toast.type === 'success' ? '#155724' : '#721c24', textDecoration: 'underline' }}>
+                                    Undo
+                                </button>
+                            )}
                         </div>
                     )}
                 </>
