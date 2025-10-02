@@ -417,18 +417,37 @@
             const [rewardCost, setRewardCost] = useState(50);
             const [familyId, setFamilyId] = useState(null);
 
+            const [rooms, setRooms] = useState([]);
+            const [newRoomName, setNewRoomName] = useState("");
+            const [editingRoom, setEditingRoom] = useState({ index: null, name: '' });
+            const [cashMultiplier, setCashMultiplier] = useState(4);
+            
+            useEffect(() => {
+                if (familyId) {
+                    const unsub = db.collection("families").doc(familyId).onSnapshot(doc => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            setRooms(data.rooms || []);
+                            setCashMultiplier(data.cashConversionMultiplier || 4);
+                        }
+                    });
+                    return () => unsub();
+                }
+            }, [familyId]);
+
             const handleCreateFamily = async () => {
                 if (!familyName.trim()) return;
                  try {
                     const createFamily = functions.httpsCallable("createFamily");
                     const result = await createFamily({ familyName: familyName.trim() });
                     if(result.data.familyId) {
-                        setFamilyId(result.data.familyId);
-                         await db.collection("families").doc(result.data.familyId).set({
+                        const newFamilyId = result.data.familyId;
+                        setFamilyId(newFamilyId);
+                         await db.collection("families").doc(newFamilyId).set({
                             name: familyName.trim(),
                             creatorId: user.uid,
                             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            rooms: ["Kitchen", "Bedroom", "Bathroom", "Dining Room", "Upstairs Bathroom", "Upstairs Bedroom", "Backyard", "Living Room", "Alex's Office", "Back Bathroom", "Front Hallway"],
+                            rooms: ["Kitchen", "Bathroom", "Living Room", "Bedroom"],
                             cashConversionMultiplier: 4
                         });
                         setStep(2);
@@ -473,6 +492,43 @@
             
             const handleFinish = async () => {
                  await db.collection("users").doc(user.uid).update({ onboardingComplete: true });
+            };
+
+            const handleSaveRooms = async () => {
+                if (!familyId) return;
+                await db.collection("families").doc(familyId).update({ rooms });
+                setStep(6);
+            };
+
+            const handleSaveMultiplier = async () => {
+                if (!familyId) return;
+                await db.collection("families").doc(familyId).update({ cashConversionMultiplier: parseInt(cashMultiplier) });
+                setStep(7);
+            };
+
+            const handleAddRoom = () => {
+                if (!newRoomName.trim()) return;
+                setRooms([...rooms, newRoomName.trim()]);
+                setNewRoomName("");
+            };
+
+            const handleDeleteRoom = (index) => {
+                setRooms(rooms.filter((_, i) => i !== index));
+            };
+
+            const handleUpdateRoom = () => {
+                const updatedRooms = [...rooms];
+                updatedRooms[editingRoom.index] = editingRoom.name;
+                setRooms(updatedRooms);
+                setEditingRoom({ index: null, name: '' });
+            };
+
+            const handleMoveRoom = (index, direction) => {
+                const newIndex = direction === 'up' ? index - 1 : index + 1;
+                if (newIndex < 0 || newIndex >= rooms.length) return;
+                const updatedRooms = [...rooms];
+                [updatedRooms[index], updatedRooms[newIndex]] = [updatedRooms[newIndex], updatedRooms[index]];
+                setRooms(updatedRooms);
             };
 
             const renderStep = () => {
@@ -522,14 +578,56 @@
                             </div>
                         );
                     case 5:
-                        return (
+                         return (
                             <div>
-                                <h2>Quick Customization</h2>
-                                <p>You can customize rooms and set a cash value for points in your profile settings later.</p>
-                                <button className="full-width-button" onClick={() => setStep(6)}>Finish Setup</button>
+                                <h2>Customize Your Rooms</h2>
+                                <p>Tailor the list of rooms to match your home. You can always change this later in your profile settings.</p>
+                                <div className="input-group">
+                                    <input type="text" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} placeholder="New room name" />
+                                    <button onClick={handleAddRoom}>Add Room</button>
+                                </div>
+                                <ul className="list-group" style={{marginTop: "20px", maxHeight: '200px', overflowY: 'auto'}}>
+                                    {rooms.map((room, index) => (
+                                        <li key={index} className="list-item">
+                                            {editingRoom.index === index ? (
+                                                <>
+                                                    <input type="text" value={editingRoom.name} onChange={(e) => setEditingRoom({...editingRoom, name: e.target.value})} />
+                                                    <div className="action-buttons">
+                                                        <button className="complete-btn" onClick={handleUpdateRoom}>Save</button>
+                                                        <button className="delete-btn" onClick={() => setEditingRoom({index: null, name: ''})}>Cancel</button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>{room}</span>
+                                                    <div className="action-buttons">
+                                                        <button onClick={() => handleMoveRoom(index, 'up')} disabled={index === 0}>↑</button>
+                                                        <button onClick={() => handleMoveRoom(index, 'down')} disabled={index === rooms.length - 1}>↓</button>
+                                                        <button className="edit-btn" onClick={() => setEditingRoom({index, name: room})}>Edit</button>
+                                                        <button className="delete-btn" onClick={() => handleDeleteRoom(index)}>Delete</button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <button className="full-width-button" onClick={handleSaveRooms}>Save and Continue</button>
                             </div>
                         );
-                     case 6:
+                    case 6:
+                        return (
+                            <div>
+                                <h2>Set a Cash Value (Optional)</h2>
+                                <p>You can let your family redeem points for real money. Set how many points are equal to one dollar.</p>
+                                <div className="input-group">
+                                    <input type="number" min="1" value={cashMultiplier} onChange={(e) => setCashMultiplier(e.target.value)} />
+                                     <span> points = $1.00</span>
+                                </div>
+                                <button className="full-width-button" onClick={handleSaveMultiplier}>Save and Continue</button>
+                                <button className="full-width-button" style={{backgroundColor: '#777', marginTop: '10px'}} onClick={() => setStep(7)}>Skip for now</button>
+                            </div>
+                        );
+                     case 7:
                         return (
                             <div>
                                 <h2>You're All Set!</h2>
