@@ -352,6 +352,7 @@
                                         rewardRedeemed: true,
                                         rewardFulfilled: true,
                                     },
+                                    onboardingComplete: false,
                                 });
                             }
                             setLoading(false);
@@ -398,58 +399,155 @@
             
             if (user && !userData) { return <div className="auth-container"><div className="auth-box">Loading user data...</div></div>; }
             
-            if (user && userData && !userData.familyId) {
-                return <FamilySetup user={user} />;
+            if (user && userData && !userData.onboardingComplete && userData.role !== 'child') {
+                return <OnboardingWizard user={user} />;
             }
 
             return ( <AuthContext.Provider value={{ user, userData, familyMembers, familyData }}>{children}</AuthContext.Provider> );
         };
         
-        const FamilySetup = ({ user }) => {
+        const OnboardingWizard = ({ user }) => {
+            const [step, setStep] = useState(1);
             const [familyName, setFamilyName] = useState("");
-            const [feedback, setFeedback] = useState({ type: "", message: "" });
+            const [inviteEmail, setInviteEmail] = useState("");
+            const [pendingInvites, setPendingInvites] = useState([]);
+            const [choreTitle, setChoreTitle] = useState("");
+            const [chorePoints, setChorePoints] = useState(10);
+            const [rewardName, setRewardName] = useState("");
+            const [rewardCost, setRewardCost] = useState(50);
+            const [familyId, setFamilyId] = useState(null);
 
-            const showFeedback = (type, message) => {
-                setFeedback({ type, message });
-                setTimeout(() => setFeedback({ type: "", message: "" }), 4000);
-            };
-
-            const handleCreateFamily = async (e) => {
-                e.preventDefault();
-                if (!familyName.trim()) {
-                    showFeedback("error", "Please enter a family name.");
-                    return;
-                }
-
-                try {
+            const handleCreateFamily = async () => {
+                if (!familyName.trim()) return;
+                 try {
                     const createFamily = functions.httpsCallable("createFamily");
                     const result = await createFamily({ familyName: familyName.trim() });
                     if(result.data.familyId) {
-                        await db.collection("families").doc(result.data.familyId).update({
-                            rooms: ["Kitchen", "Living Room", "Bedroom"],
+                        setFamilyId(result.data.familyId);
+                         await db.collection("families").doc(result.data.familyId).set({
+                            name: familyName.trim(),
+                            creatorId: user.uid,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            rooms: ["Kitchen", "Bedroom", "Bathroom", "Dining Room", "Upstairs Bathroom", "Upstairs Bedroom", "Backyard", "Living Room", "Alex's Office", "Back Bathroom", "Front Hallway"],
                             cashConversionMultiplier: 4
                         });
+                        setStep(2);
                     }
                 } catch (error) {
                     console.error("Error creating family:", error);
-                    showFeedback("error", error.message || "Could not create family.");
+                }
+            };
+            
+            const handleSendInvite = async () => {
+                if (!inviteEmail.trim() || !familyId) return;
+                await db.collection("invites").add({ email: inviteEmail.toLowerCase(), familyId, invitedBy: user.uid, invitedByEmail: user.email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                setPendingInvites([...pendingInvites, inviteEmail]);
+                setInviteEmail("");
+            };
+
+            const handleCreateChore = async () => {
+                if (!choreTitle.trim() || !familyId) return;
+                await db.collection("chores").add({
+                    title: choreTitle,
+                    points: parseInt(chorePoints),
+                    familyId,
+                    isComplete: false,
+                    addedBy: user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setStep(4);
+            };
+
+            const handleCreateReward = async () => {
+                if (!rewardName.trim() || !familyId) return;
+                 await db.collection("marketplace_items").add({
+                    name: rewardName,
+                    cost: parseInt(rewardCost),
+                    providerId: user.uid,
+                    providerDisplayName: user.displayName || user.email.split('@')[0],
+                    familyId,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setStep(5);
+            };
+            
+            const handleFinish = async () => {
+                 await db.collection("users").doc(user.uid).update({ onboardingComplete: true });
+            };
+
+            const renderStep = () => {
+                switch(step) {
+                    case 1:
+                        return (
+                            <div>
+                                <h2>Welcome to Chore Tracker!</h2>
+                                <p>Let's get your family set up. First, what's your family's name?</p>
+                                <div className="input-group">
+                                    <input type="text" placeholder="e.g., The Simpsons" value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
+                                    <button onClick={handleCreateFamily}>Create Family</button>
+                                </div>
+                            </div>
+                        );
+                    case 2:
+                        return (
+                             <div>
+                                <h2>Invite Your Family</h2>
+                                <p>Send invites to family members so they can join in.</p>
+                                <div className="input-group">
+                                    <input type="email" placeholder="family.member@email.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+                                    <button onClick={handleSendInvite}>Send Invite</button>
+                                </div>
+                                {pendingInvites.length > 0 && <div><p>Invites sent to:</p><ul>{pendingInvites.map((email, i) => <li key={i}>{email}</li>)}</ul></div>}
+                                <button className="full-width-button" onClick={() => setStep(3)}>Next</button>
+                            </div>
+                        );
+                    case 3:
+                        return (
+                             <div>
+                                <h2>Create Your First Chore</h2>
+                                <p>Chores are tasks your family can complete to earn points.</p>
+                                <div className="input-group"><label>Chore Title:</label><input type="text" value={choreTitle} onChange={e => setChoreTitle(e.target.value)} placeholder="e.g., Take out the trash" /></div>
+                                <div className="input-group"><label>Points Value:</label><input type="number" value={chorePoints} onChange={e => setChorePoints(e.target.value)} /></div>
+                                <button className="full-width-button" onClick={handleCreateChore}>Create Chore</button>
+                            </div>
+                        );
+                    case 4:
+                         return (
+                            <div>
+                                <h2>Create Your First Reward</h2>
+                                <p>Points can be redeemed for rewards that you create.</p>
+                                <div className="input-group"><label>Reward Name:</label><input type="text" value={rewardName} onChange={e => setRewardName(e.target.value)} placeholder="e.g., 1 hour of video games" /></div>
+                                <div className="input-group"><label>Point Cost:</label><input type="number" value={rewardCost} onChange={e => setRewardCost(e.target.value)} /></div>
+                                <button className="full-width-button" onClick={handleCreateReward}>Create Reward</button>
+                            </div>
+                        );
+                    case 5:
+                        return (
+                            <div>
+                                <h2>Quick Customization</h2>
+                                <p>You can customize rooms and set a cash value for points in your profile settings later.</p>
+                                <button className="full-width-button" onClick={() => setStep(6)}>Finish Setup</button>
+                            </div>
+                        );
+                     case 6:
+                        return (
+                            <div>
+                                <h2>You're All Set!</h2>
+                                <p>Your family is ready to start tracking chores and earning rewards.</p>
+                                <button className="full-width-button" onClick={handleFinish}>Let's Go!</button>
+                            </div>
+                        );
+                    default: return null;
                 }
             };
 
             return (
-                 <div className="auth-container">
-                    <div className="auth-box">
-                        <h2>Welcome!</h2>
-                        <p>You're one step away from a cleaner house and a happier family. Chore Tracker helps you assign, track, and reward chores to build good habits and make home life more peaceful (and fun!).</p>
-                        <p>To get started, create a family to share and manage chores.</p>
-                        <form onSubmit={handleCreateFamily} className="auth-form">
-                            <input type="text" placeholder="Enter Your Family Name" value={familyName} onChange={(e) => setFamilyName(e.target.value)} required />
-                            <button type="submit">Create Family</button>
-                            {feedback.message && <p style={{ color: feedback.type === "error" ? "red" : "green", fontSize: "0.9rem" }}>{feedback.message}</p>}
-                        </form>
+                <div className="auth-container">
+                    <div className="auth-box" style={{textAlign: 'left'}}>
+                        {renderStep()}
                     </div>
                 </div>
-            );
+            )
         };
 
 
@@ -472,28 +570,44 @@
                         }
                     } 
                     else {
-                        const inviteQuery = await db.collection("invites").where("email", "==", email.toLowerCase()).limit(1).get();
-                        if (inviteQuery.empty) { setError("This email has not been invited."); return; }
-                        
                         const { user } = await auth.createUserWithEmailAndPassword(email, password);
+                        const inviteQuery = await db.collection("invites").where("email", "==", email.toLowerCase()).limit(1).get();
                         
-                        const invite = inviteQuery.docs[0].data();
-                        
-                        await db.collection("users").doc(user.uid).set({ 
-                            points: 0, 
-                            email: user.email, 
-                            displayName: (user.email.split("@")[0]),
-                            familyId: invite.familyId,
-                            role: "child",
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            notificationPreferences: {
-                                newUnassignedChore: true,
-                                choreAssignedToMe: true,
-                                rewardRedeemed: true,
-                                rewardFulfilled: true,
-                            },
-                        });
-                        await db.collection("invites").doc(inviteQuery.docs[0].id).delete();
+                        if (!inviteQuery.empty) {
+                            // User has an invite, join the family
+                            const invite = inviteQuery.docs[0].data();
+                            await db.collection("users").doc(user.uid).set({ 
+                                points: 0, 
+                                email: user.email, 
+                                displayName: (user.email.split("@")[0]),
+                                familyId: invite.familyId,
+                                role: "child",
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                notificationPreferences: {
+                                    newUnassignedChore: true,
+                                    choreAssignedToMe: true,
+                                    rewardRedeemed: true,
+                                    rewardFulfilled: true,
+                                },
+                                onboardingComplete: true // They don't need parent onboarding
+                            });
+                            await db.collection("invites").doc(inviteQuery.docs[0].id).delete();
+                        } else {
+                            // No invite, this is a new parent starting a family
+                            await db.collection("users").doc(user.uid).set({ 
+                                points: 0, 
+                                email: user.email, 
+                                displayName: (user.email.split("@")[0]),
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                notificationPreferences: {
+                                    newUnassignedChore: true,
+                                    choreAssignedToMe: true,
+                                    rewardRedeemed: true,
+                                    rewardFulfilled: true,
+                                },
+                                onboardingComplete: false // Trigger the onboarding wizard
+                            });
+                        }
                     }
                 } catch (err) { setError(err.message); }
             };
