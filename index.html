@@ -353,7 +353,7 @@
                                         rewardFulfilled: true,
                                     },
                                     onboardingComplete: false,
-                                });
+                                }, { merge: true }); // *** THIS IS THE FIX ***
                             }
                             setLoading(false);
                         });
