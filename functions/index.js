@@ -124,6 +124,79 @@ exports.createFamily = onCall(async (request) => {
   }
 });
 
+exports.getRecurringChoresWithStats = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const uid = request.auth.uid;
+  const db = admin.firestore();
+
+  const userDoc = await db.collection("users").doc(uid).get();
+  if (!userDoc.exists || !userDoc.data().familyId) {
+    throw new HttpsError("failed-precondition", "User not in a family.");
+  }
+  const familyId = userDoc.data().familyId;
+
+  try {
+    const recurringChoresSnapshot = await db.collection("recurring_chores")
+        .where("familyId", "==", familyId).get();
+    if (recurringChoresSnapshot.empty) {
+      return {chores: []};
+    }
+
+    const choresWithStats = await Promise.all(recurringChoresSnapshot.docs
+        .map(async (doc) => {
+          const template = {id: doc.id, ...doc.data()};
+          const instancesSnapshot = await db.collection("chores")
+              .where("familyId", "==", familyId)
+              .where("recurringTemplateId", "==", template.id)
+              .get();
+
+          let completedInstances = 0;
+          const totalInstances = instancesSnapshot.size;
+
+          instancesSnapshot.forEach((instanceDoc) => {
+            if (instanceDoc.data().isComplete) {
+              completedInstances++;
+            }
+          });
+
+          const completionRate = totalInstances > 0 ?
+            (completedInstances / totalInstances) * 100 : 0;
+
+          // Make sure addedByEmail is included for sorting
+          const creatorId = template.addedBy;
+          let creatorDisplayName = "Unknown";
+          if (creatorId) {
+            const creatorDoc = await db.collection("users").doc(creatorId)
+                .get();
+            if (creatorDoc.exists) {
+              creatorDisplayName = creatorDoc.data().displayName ||
+              creatorDoc.data().email;
+            }
+          }
+
+
+          return {
+            ...template,
+            totalInstances,
+            completedInstances,
+            completionRate: parseFloat(completionRate.toFixed(1)),
+            creatorDisplayName: creatorDisplayName,
+            // Ensure createdAt is a serializable format (ISO string)
+            createdAt: template.createdAt.toDate().toISOString(),
+          };
+        }));
+
+    return {chores: choresWithStats};
+  } catch (error) {
+    console.error("Error fetching recurring chores with stats:", error);
+    throw new HttpsError("internal",
+        "Failed to fetch recurring chores data.");
+  }
+});
+
+
 /**
  * Generates recurring chores for all families.
  * Scheduled to run daily at 7:00 AM Pacific Time.

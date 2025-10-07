@@ -172,6 +172,31 @@
         .stat-card h4 { margin: 0 0 5px 0; font-size: 0.9rem; color: #555; }
         .stat-card p { margin: 0; font-size: 1.4rem; font-weight: bold; color: #6a0dad; }
         
+        .recurring-chores-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f4ff;
+            border-radius: 8px;
+        }
+        .recurring-chores-header h3 {
+            margin: 0;
+            color: #6a0dad;
+        }
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .sort-controls select, .sort-controls button {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 0.9rem;
+        }
+
         .room-stat-card { display: flex; flex-direction: column; justify-content: space-between; background: #f7f9fc; padding: 15px; border-radius: 8px; text-align: center; }
         .room-stat-card h4 { margin: 0 0 5px 0; font-size: 0.9rem; color: #555; flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .room-stats .progress-bar { background-color: #e9d5ff; border-radius: 8px; overflow: hidden; margin-top: auto; }
@@ -1370,13 +1395,30 @@
         const RecurringChoresManager = ({ openChoreModal, showToast }) => {
             const { userData } = useContext(AuthContext); 
             const [recurringChores, setRecurringChores] = useState([]);
-            
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [sortConfig, setSortConfig] = useState({ key: 'completionRate', direction: 'desc' });
+
             useEffect(() => { 
-                if (!userData.familyId) return; 
-                const unsubscribe = db.collection("recurring_chores").where("familyId", "==", userData.familyId).orderBy("createdAt", "desc").onSnapshot(snapshot => { 
-                    setRecurringChores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
-                }); 
-                return () => unsubscribe(); 
+                if (!userData.familyId) {
+                    setLoading(false);
+                    return;
+                }
+                const fetchChores = async () => {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                        const getChores = functions.httpsCallable('getRecurringChoresWithStats');
+                        const result = await getChores();
+                        setRecurringChores(result.data.chores || []);
+                    } catch (err) {
+                        console.error("Error fetching recurring chores stats:", err);
+                        setError("Could not load recurring chores. Please try again later.");
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchChores();
             }, [userData.familyId]);
 
             const handleDeleteClick = async (chore) => {
@@ -1385,26 +1427,107 @@
                     db.collection("recurring_chores").doc(chore.id).set(chore);
                 });
             };
+
+            const sortedAndGroupedChores = () => {
+                const grouped = {
+                    daily: [],
+                    weekly: [],
+                    monthly: [],
+                    pickDays: []
+                };
+
+                recurringChores.forEach(chore => {
+                    if (grouped[chore.frequency]) {
+                        grouped[chore.frequency].push(chore);
+                    }
+                });
+
+                const sortChores = (chores) => {
+                    return [...chores].sort((a, b) => {
+                        const aValue = a[sortConfig.key];
+                        const bValue = b[sortConfig.key];
+
+                        if (aValue < bValue) {
+                            return sortConfig.direction === 'asc' ? -1 : 1;
+                        }
+                        if (aValue > bValue) {
+                            return sortConfig.direction === 'asc' ? 1 : -1;
+                        }
+                        return 0;
+                    });
+                }
+
+                for (const group in grouped) {
+                    grouped[group] = sortChores(grouped[group]);
+                }
+
+                return grouped;
+            };
             
-            const getFrequencyDetails = (chore) => { if (chore.frequency === "weekly") return `Weekly on ${chore.dayOfWeek}`; if (chore.frequency === "monthly") return `Monthly on day ${chore.dayOfMonth}`; if (chore.frequency === "pickDays") return `On ${chore.pickedDays.join(", ")}`; return chore.frequency; };
+            const handleSortChange = (e) => {
+                setSortConfig(prev => ({...prev, key: e.target.value}));
+            };
+
+            const toggleSortDirection = () => {
+                setSortConfig(prev => ({...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }));
+            };
+
+            const getFrequencyDetails = (chore) => { 
+                if (chore.frequency === "weekly") return `Weekly on ${chore.dayOfWeek}`;
+                if (chore.frequency === "monthly") return `Monthly on day ${chore.dayOfMonth}`;
+                if (chore.frequency === "pickDays") return `On ${chore.pickedDays.join(", ")}`;
+                return chore.frequency.charAt(0).toUpperCase() + chore.frequency.slice(1);
+            };
+
+            if (loading) return <p>Loading recurring chores...</p>;
+            if (error) return <p className="feedback-message error">{error}</p>;
+
+            const groupedChores = sortedAndGroupedChores();
 
             return (
                 <div>
-                    <h3 className="section-title">Recurring Chore Templates</h3>
-                    {recurringChores.map(chore => ( 
-                        <li key={chore.id} className="list-item">
-                            <div className="item-details">
-                                <h4>{chore.title}</h4>
-                                <p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
-                                <p>Frequency: {getFrequencyDetails(chore)}</p>
-                                {chore.assignedToDisplayName && <p>Assigned to: {chore.assignedToDisplayName}</p>}
+                     <div className="recurring-chores-header">
+                        <h3>Chore Templates</h3>
+                        <div className="sort-controls">
+                            <label htmlFor="sort-select" style={{fontSize: '0.9rem'}}>Sort by:</label>
+                            <select id="sort-select" value={sortConfig.key} onChange={handleSortChange}>
+                                <option value="completionRate">Completion Rate</option>
+                                <option value="createdAt">Date Created</option>
+                                <option value="points">Points</option>
+                                <option value="creatorDisplayName">Creator</option>
+                            </select>
+                            <button onClick={toggleSortDirection}>
+                                {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {Object.entries(groupedChores).map(([freq, chores]) => (
+                        chores.length > 0 && (
+                            <div key={freq} style={{marginBottom: '30px'}}>
+                                <h3 className="section-title" style={{fontSize: '1.3rem', borderBottom: '2px solid #f0f4f7', paddingBottom: '10px'}}>{getFrequencyDetails({frequency: freq, dayOfWeek: '', dayOfMonth: '', pickedDays: []})}</h3>
+                                <ul className="list-group">
+                                    {chores.map(chore => ( 
+                                        <li key={chore.id} className="list-item">
+                                            <div className="item-details">
+                                                <h4>{chore.title}</h4>
+                                                <p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
+                                                <p>Frequency: {getFrequencyDetails(chore)}</p>
+                                                {chore.assignedToDisplayName && <p>Assigned to: {chore.assignedToDisplayName}</p>}
+                                                <p>Completion: {chore.completionRate}% ({chore.completedInstances}/{chore.totalInstances})</p>
+                                                <p><small>Created by: {chore.creatorDisplayName || 'Unknown'}</small></p>
+                                            </div>
+                                            <div className="action-buttons">
+                                                <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>
+                                                <button className="delete-btn" onClick={() => handleDeleteClick(chore)}>Delete</button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
-                            <div className="action-buttons">
-                                <button className="edit-btn" onClick={() => openChoreModal(chore)}>Edit</button>
-                                <button className="delete-btn" onClick={() => handleDeleteClick(chore)}>Delete</button>
-                            </div>
-                        </li>
+                        )
                     ))}
+
                     {recurringChores.length === 0 && <p className="no-tasks">No recurring chores defined yet.</p>}
                 </div>
             );
@@ -2263,3 +2386,4 @@
     </script>
 </body>
 </html>
+
