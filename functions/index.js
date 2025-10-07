@@ -103,6 +103,7 @@ exports.createFamily = onCall(async (request) => {
       name: familyName.trim(),
       creatorId: uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      onboardingComplete: false, // Set onboarding to false initially
     });
 
     batch.update(userRef, {
@@ -183,7 +184,20 @@ exports.generateDailyChores = onSchedule({
         }
 
         if (shouldGenerate) {
-          // Check for any existing incomplete chore from this template.
+          // Check for any existing incomplete chore from this template today.
+          // This uses the predictable ID to prevent duplicates.
+          const newChoreId = `${recurringChore.id}_${dateString}`;
+          const existingChoreRef = choresRef.doc(newChoreId);
+          const existingChoreDoc = await existingChoreRef.get();
+
+          if (existingChoreDoc.exists) {
+            console.log(`Skipping generation for "${recurringChore.title}" ` +
+              `for family ${familyId} because a chore for today ` +
+              "already exists.");
+            continue;
+          }
+
+          // Also check for any older incomplete chores from this template
           const existingIncompleteQuery = choresRef
               .where("familyId", "==", familyId)
               .where("recurringTemplateId", "==", recurringChore.id)
@@ -193,14 +207,12 @@ exports.generateDailyChores = onSchedule({
 
           if (!incompleteSnapshot.empty) {
             console.log(`Skipping generation for "${recurringChore.title}" ` +
-              `for family ${familyId} because an incomplete version ` +
+              `for family ${familyId} because an older incomplete version ` +
               "already exists.");
             continue;
           }
 
-          // Create a predictable, unique ID to prevent race
-          // condition duplicates
-          const newChoreId = `${recurringChore.id}_${dateString}`;
+
           const newChoreRef = choresRef.doc(newChoreId);
 
           const newChoreData = {
@@ -320,17 +332,20 @@ exports.undoRewardPurchase = onCall(async (request) => {
       points: admin.firestore.FieldValue.increment(cost),
     });
 
-    // 2. Put the item back on the marketplace
-    const marketplaceItemRef = db.collection("marketplace_items").doc();
-    batch.set(marketplaceItemRef, {
-      name: redeemedRewardData.name,
-      description: redeemedRewardData.description,
-      cost: redeemedRewardData.cost,
-      providerId: redeemedRewardData.providerId,
-      providerDisplayName: redeemedRewardData.providerDisplayName,
-      familyId: redeemedRewardData.familyId,
-      createdAt: redeemedRewardData.createdAt,
-    });
+    // 2. Put the item back on the marketplace (if it's not a cash redemption)
+    if (redeemedRewardData.providerId !== "CASH_REDEMPTION") {
+      const marketplaceItemRef = db.collection("marketplace_items").doc();
+      batch.set(marketplaceItemRef, {
+        name: redeemedRewardData.name,
+        description: redeemedRewardData.description,
+        cost: redeemedRewardData.cost,
+        providerId: redeemedRewardData.providerId,
+        providerDisplayName: redeemedRewardData.providerDisplayName,
+        familyId: redeemedRewardData.familyId,
+        createdAt: redeemedRewardData.createdAt,
+      });
+    }
+
 
     // 3. Delete the redeemed reward document
     batch.delete(redeemedRewardRef);

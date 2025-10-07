@@ -247,72 +247,7 @@
                 }
             } catch (error) { console.error("An error occurred while setting up notifications.", error); }
         };
-
-        const getStartOfDay = (date) => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d; };
         
-        const generateRecurringChores = async (firestoreDb, familyId) => {
-            if(!familyId) return;
-            const now = new Date();
-            const today = getStartOfDay(now);
-            const lastCheckKey = `lastRecurringGenerationCheck_${familyId}`;
-            const lastGenerationCheck = localStorage.getItem(lastCheckKey);
-            if (lastGenerationCheck && getStartOfDay(new Date(lastGenerationCheck)).getTime() === today.getTime()) { return; }
-            if (now.getHours() < 8) { return; }
-            
-            const recurringChoresRef = firestoreDb.collection("recurring_chores")
-              .where("familyId", "==", familyId);
-            const choresRef = firestoreDb.collection("chores");
-            try {
-                const snapshot = await recurringChoresRef.get();
-                const batch = firestoreDb.batch();
-                let choresGeneratedCount = 0;
-
-                for (const doc of snapshot.docs) {
-                    const recurringChore = { id: doc.id, ...doc.data() };
-                    let shouldGenerate = false;
-                    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-                    const currentDayName = daysOfWeek[now.getDay()];
-
-                    switch (recurringChore.frequency) {
-                        case "daily": shouldGenerate = true; break;
-                        case "weekly": if (currentDayName === recurringChore.dayOfWeek) { shouldGenerate = true; } break;
-                        case "monthly": if (now.getDate() === recurringChore.dayOfMonth) { shouldGenerate = true; } break;
-                        case "pickDays": if (recurringChore.pickedDays && recurringChore.pickedDays.includes(currentDayName)) { shouldGenerate = true; } break;
-                    }
-
-                    if (shouldGenerate) {
-                        const existingIncompleteQuery = choresRef
-                            .where("recurringTemplateId", "==", recurringChore.id)
-                            .where("familyId", "==", familyId)
-                            .where("isComplete", "==", false);
-                        
-                        const incompleteSnapshot = await existingIncompleteQuery.get();
-
-                        if (!incompleteSnapshot.empty) {
-                            console.log(`Skipping generation for "${recurringChore.title}" because an incomplete version already exists.`);
-                            continue; 
-                        }
-                        
-                        const newChore = {
-                            ...recurringChore,
-                            isComplete: false,
-                            isRecurring: true,
-                            recurringTemplateId: recurringChore.id,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-                        delete newChore.id;
-                        batch.set(choresRef.doc(), newChore);
-                        choresGeneratedCount++;
-                    }
-                }
-                if (choresGeneratedCount > 0) { 
-                    await batch.commit(); 
-                    console.log(`${choresGeneratedCount} recurring chores generated for family ${familyId}.`);
-                }
-                localStorage.setItem(lastCheckKey, now.toISOString());
-            } catch (error) { console.error("Error generating recurring chores:", error); }
-        };
-
         const AuthContext = createContext(null);
 
         const AuthProvider = ({ children }) => {
@@ -331,35 +266,26 @@
                         const userRef = db.collection("users").doc(firebaseUser.uid);
                         const unsubscribeUserDoc = userRef.onSnapshot(docSnap => {
                             if (docSnap.exists) {
-                                const data = docSnap.data();
-                                setUserData(data);
-                                if(data.familyId){
-                                    generateRecurringChores(db, data.familyId);
-                                }
+                                setUserData(docSnap.data());
                                 if (!notificationsInitialized.current) {
                                     setupNotifications(firebaseUser);
                                     notificationsInitialized.current = true;
                                 }
                             } else {
-                                userRef.set({ 
-                                    points: 0, 
-                                    email: firebaseUser.email, 
-                                    displayName: (firebaseUser.displayName || firebaseUser.email.split("@")[0]),
-                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                    notificationPreferences: {
-                                        newUnassignedChore: true,
-                                        choreAssignedToMe: true,
-                                        rewardRedeemed: true,
-                                        rewardFulfilled: true,
-                                    },
-                                    onboardingComplete: false,
-                                }, { merge: true }); // *** THIS IS THE FIX ***
+                                // This block will run for a brand new user after signup
+                                // but before the signup function has created their user doc.
+                                // We can leave it empty or set a temporary state.
                             }
+                            setLoading(false);
+                        }, error => {
+                            console.error("Error fetching user document:", error);
                             setLoading(false);
                         });
                         return () => unsubscribeUserDoc();
                     } else { 
                         setUserData(null);
+                        setFamilyData(null);
+                        setFamilyMembers([]);
                         setLoading(false);
                     }
                 });
@@ -371,7 +297,7 @@
                      const unsubscribe = db.collection("users").where("familyId", "==", userData.familyId).onSnapshot(snapshot => {
                         const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() })); 
                         setFamilyMembers(members);
-                    });
+                    }, error => console.error("Error fetching family members:", error));
                     return () => unsubscribe();
                 } else {
                     setFamilyMembers([]);
@@ -387,26 +313,24 @@
                         } else {
                             setFamilyData(null);
                         }
-                    });
+                    }, error => console.error("Error fetching family data:", error));
                     return () => unsubscribe();
                 } else {
                     setFamilyData(null);
                 }
             }, [userData]);
 
-
             if (loading) { return <div className="auth-container"><div className="auth-box">Loading...</div></div>; }
             
-            if (user && !userData) { return <div className="auth-container"><div className="auth-box">Loading user data...</div></div>; }
-            
-            if (user && userData && !userData.onboardingComplete && userData.role !== 'child') {
-                return <OnboardingWizard user={user} />;
+            // Wait until both user and family data are loaded before checking for onboarding
+            if (user && userData && userData.role === 'parent' && familyData && !familyData.onboardingComplete) {
+                return <OnboardingWizard user={user} familyId={familyData.id} />;
             }
-
+            
             return ( <AuthContext.Provider value={{ user, userData, familyMembers, familyData }}>{children}</AuthContext.Provider> );
         };
         
-        const OnboardingWizard = ({ user }) => {
+        const OnboardingWizard = ({ user, familyId: initialFamilyId }) => {
             const [step, setStep] = useState(1);
             const [familyName, setFamilyName] = useState("");
             const [inviteEmail, setInviteEmail] = useState("");
@@ -415,7 +339,7 @@
             const [chorePoints, setChorePoints] = useState(10);
             const [rewardName, setRewardName] = useState("");
             const [rewardCost, setRewardCost] = useState(50);
-            const [familyId, setFamilyId] = useState(null);
+            const [familyId, setFamilyId] = useState(initialFamilyId);
 
             const [rooms, setRooms] = useState([]);
             const [newRoomName, setNewRoomName] = useState("");
@@ -423,7 +347,9 @@
             const [cashMultiplier, setCashMultiplier] = useState(4);
             
             useEffect(() => {
+                // If familyId is passed from AuthProvider, start at step 2
                 if (familyId) {
+                    setStep(2);
                     const unsub = db.collection("families").doc(familyId).onSnapshot(doc => {
                         if (doc.exists) {
                             const data = doc.data();
@@ -442,15 +368,12 @@
                     const result = await createFamily({ familyName: familyName.trim() });
                     if(result.data.familyId) {
                         const newFamilyId = result.data.familyId;
-                        setFamilyId(newFamilyId);
-                         await db.collection("families").doc(newFamilyId).set({
-                            name: familyName.trim(),
-                            creatorId: user.uid,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        // The cloud function now handles setting onboardingComplete to false
+                        await db.collection("families").doc(newFamilyId).set({
                             rooms: ["Kitchen", "Bathroom", "Living Room", "Bedroom"],
                             cashConversionMultiplier: 4
-                        });
-                        setStep(2);
+                        }, { merge: true });
+                        setFamilyId(newFamilyId); // This will trigger the useEffect to move to step 2
                     }
                 } catch (error) {
                     console.error("Error creating family:", error);
@@ -472,6 +395,7 @@
                     familyId,
                     isComplete: false,
                     addedBy: user.uid,
+                    addedByEmail: user.email,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 setStep(4);
@@ -491,7 +415,8 @@
             };
             
             const handleFinish = async () => {
-                 await db.collection("users").doc(user.uid).update({ onboardingComplete: true });
+                 if (!familyId) return;
+                 await db.collection("families").doc(familyId).update({ onboardingComplete: true });
             };
 
             const handleSaveRooms = async () => {
@@ -656,6 +581,39 @@
             const [error, setError] = useState("");
             const [pendingCred, setPendingCred] = useState(null);
 
+            const handleCredentialSetup = async (user) => {
+                const userRef = db.collection("users").doc(user.uid);
+                const userDoc = await userRef.get();
+        
+                if (userDoc.exists) return; // User doc already exists, do nothing
+
+                const inviteQuery = await db.collection("invites").where("email", "==", user.email.toLowerCase()).limit(1).get();
+                
+                if (!inviteQuery.empty) {
+                    const invite = inviteQuery.docs[0].data();
+                    await userRef.set({ 
+                        points: 0, 
+                        email: user.email, 
+                        displayName: (user.displayName || user.email.split("@")[0]),
+                        familyId: invite.familyId,
+                        role: "child",
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        notificationPreferences: { newUnassignedChore: true, choreAssignedToMe: true, rewardRedeemed: true, rewardFulfilled: true },
+                    });
+                    await db.collection("invites").doc(inviteQuery.docs[0].id).delete();
+                } else {
+                    // This is a new parent starting a family, onboarding will be triggered by AuthProvider
+                     await userRef.set({ 
+                        points: 0, 
+                        email: user.email, 
+                        displayName: (user.displayName || user.email.split("@")[0]),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        notificationPreferences: { newUnassignedChore: true, choreAssignedToMe: true, rewardRedeemed: true, rewardFulfilled: true },
+                    });
+                }
+            };
+
+
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setError("");
@@ -669,43 +627,7 @@
                     } 
                     else {
                         const { user } = await auth.createUserWithEmailAndPassword(email, password);
-                        const inviteQuery = await db.collection("invites").where("email", "==", email.toLowerCase()).limit(1).get();
-                        
-                        if (!inviteQuery.empty) {
-                            // User has an invite, join the family
-                            const invite = inviteQuery.docs[0].data();
-                            await db.collection("users").doc(user.uid).set({ 
-                                points: 0, 
-                                email: user.email, 
-                                displayName: (user.email.split("@")[0]),
-                                familyId: invite.familyId,
-                                role: "child",
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                notificationPreferences: {
-                                    newUnassignedChore: true,
-                                    choreAssignedToMe: true,
-                                    rewardRedeemed: true,
-                                    rewardFulfilled: true,
-                                },
-                                onboardingComplete: true // They don't need parent onboarding
-                            });
-                            await db.collection("invites").doc(inviteQuery.docs[0].id).delete();
-                        } else {
-                            // No invite, this is a new parent starting a family
-                            await db.collection("users").doc(user.uid).set({ 
-                                points: 0, 
-                                email: user.email, 
-                                displayName: (user.email.split("@")[0]),
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                notificationPreferences: {
-                                    newUnassignedChore: true,
-                                    choreAssignedToMe: true,
-                                    rewardRedeemed: true,
-                                    rewardFulfilled: true,
-                                },
-                                onboardingComplete: false // Trigger the onboarding wizard
-                            });
-                        }
+                        await handleCredentialSetup(user);
                     }
                 } catch (err) { setError(err.message); }
             };
@@ -714,7 +636,8 @@
                 setError("");
                 const provider = new firebase.auth.GoogleAuthProvider();
                 try {
-                    await auth.signInWithPopup(provider);
+                    const result = await auth.signInWithPopup(provider);
+                    await handleCredentialSetup(result.user);
                 } catch (err) {
                     if (err.code === "auth/account-exists-with-different-credential") {
                         setPendingCred(err.credential);
@@ -1397,20 +1320,49 @@
                 });
             };
             
+            const rewardsToFulfill = rewards.filter(r => (r.providerId === user.uid) || (r.providerId === 'CASH_REDEMPTION' && isParent));
+            const myPendingRewards = rewards.filter(r => r.purchasedBy === user.uid);
+
             return (
                 <div>
-                    <h3 className="section-title" style={{marginTop: "30px"}}>Rewards to Fulfill</h3>
-                     <ul className="list-group">
-                        {rewards.filter(r => r.providerId === user.uid).map(reward => (
-                            <li key={reward.id} className="list-item">
-                                <div className="item-details">
-                                    <h4>{reward.name}</h4><p>{reward.description}</p><p>{reward.cost} points</p>
-                                    <p>Redeemed by: {reward.purchasedByDisplayName}</p>
-                                </div>
-                                <div className="action-buttons"><button className="fulfill-btn" onClick={() => handleFulfill(reward.id)}>Mark as Fulfilled</button></div>
-                            </li>
-                        ))}
-                    </ul>
+                    {isParent && (
+                        <>
+                            <h3 className="section-title">Rewards to Fulfill</h3>
+                            {rewardsToFulfill.length > 0 ? (
+                                <ul className="list-group">
+                                    {rewardsToFulfill.map(reward => (
+                                        <li key={reward.id} className="list-item">
+                                            <div className="item-details">
+                                                <h4>{reward.name}</h4>
+                                                <p>{reward.description}</p>
+                                                <p>{reward.cost} points</p>
+                                                <p>Redeemed by: <strong>{reward.purchasedByDisplayName}</strong></p>
+                                            </div>
+                                            <div className="action-buttons">
+                                                <button className="fulfill-btn" onClick={() => handleFulfill(reward.id)}>Mark as Fulfilled</button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p className="no-tasks">No rewards to fulfill right now.</p>}
+                        </>
+                    )}
+
+                    <h3 className="section-title" style={{marginTop: "30px"}}>My Pending Rewards</h3>
+                     {myPendingRewards.length > 0 ? (
+                         <ul className="list-group">
+                            {myPendingRewards.map(reward => (
+                                <li key={reward.id} className="list-item">
+                                    <div className="item-details">
+                                        <h4>{reward.name}</h4>
+                                        <p>{reward.cost} points</p>
+                                        <p>Provided by: <strong>{reward.providerDisplayName}</strong></p>
+                                        <p>Status: <span style={{color: '#ff9800', fontWeight: 'bold'}}>Pending Fulfillment</span></p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                     ) : <p className="no-tasks">You have no pending rewards.</p>}
                 </div>
             );
         };
@@ -1472,9 +1424,10 @@
                         {log.map(entry => (
                             <li key={entry.id} className="list-item">
                                 <div className="item-details">
-                                    <h4>{entry.name}</h4><p>{entry.description}</p><p>{entry.cost} points</p>
+                                    <h4>{entry.name}</h4>
+                                    <p>{entry.cost} points</p>
                                     <p>Redeemed by: <strong>{entry.purchasedByDisplayName}</strong></p>
-                                    <p>Provided / Fulfilled by: <strong>{entry.providerDisplayName}</strong> on {entry.fulfilledAt?.toDate().toLocaleDateString()}</p>
+                                    <p>Fulfilled by: <strong>{entry.providerDisplayName}</strong> on {entry.fulfilledAt?.toDate().toLocaleDateString()}</p>
                                 </div>
                             </li>
                         ))}
