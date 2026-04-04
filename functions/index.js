@@ -1,3 +1,4 @@
+/* eslint-env node */
 const admin = require("firebase-admin");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {
@@ -67,6 +68,7 @@ exports.migrateDataToFamilyModel = onCall(async (request) => {
 
 /**
  * Creates a new family and assigns the calling user as the first parent.
+ * OPTIMIZED: Now sets default rooms and cash multiplier automatically.
  */
 exports.createFamily = onCall(async (request) => {
   console.log("Request Auth Object for createFamily:", request.auth);
@@ -99,11 +101,13 @@ exports.createFamily = onCall(async (request) => {
 
     const batch = db.batch();
 
+    // Set complete family data including defaults
     batch.set(familyRef, {
       name: familyName.trim(),
       creatorId: uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      onboardingComplete: false, // Set onboarding to false initially
+      rooms: ["Kitchen", "Bathroom", "Living Room", "Bedroom"],
+      cashConversionMultiplier: 4,
     });
 
     batch.update(userRef, {
@@ -124,79 +128,6 @@ exports.createFamily = onCall(async (request) => {
   }
 });
 
-exports.getRecurringChoresWithStats = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in.");
-  }
-  const uid = request.auth.uid;
-  const db = admin.firestore();
-
-  const userDoc = await db.collection("users").doc(uid).get();
-  if (!userDoc.exists || !userDoc.data().familyId) {
-    throw new HttpsError("failed-precondition", "User not in a family.");
-  }
-  const familyId = userDoc.data().familyId;
-
-  try {
-    const recurringChoresSnapshot = await db.collection("recurring_chores")
-        .where("familyId", "==", familyId).get();
-    if (recurringChoresSnapshot.empty) {
-      return {chores: []};
-    }
-
-    const choresWithStats = await Promise.all(recurringChoresSnapshot.docs
-        .map(async (doc) => {
-          const template = {id: doc.id, ...doc.data()};
-          const instancesSnapshot = await db.collection("chores")
-              .where("familyId", "==", familyId)
-              .where("recurringTemplateId", "==", template.id)
-              .get();
-
-          let completedInstances = 0;
-          const totalInstances = instancesSnapshot.size;
-
-          instancesSnapshot.forEach((instanceDoc) => {
-            if (instanceDoc.data().isComplete) {
-              completedInstances++;
-            }
-          });
-
-          const completionRate = totalInstances > 0 ?
-            (completedInstances / totalInstances) * 100 : 0;
-
-          // Make sure addedByEmail is included for sorting
-          const creatorId = template.addedBy;
-          let creatorDisplayName = "Unknown";
-          if (creatorId) {
-            const creatorDoc = await db.collection("users").doc(creatorId)
-                .get();
-            if (creatorDoc.exists) {
-              creatorDisplayName = creatorDoc.data().displayName ||
-              creatorDoc.data().email;
-            }
-          }
-
-
-          return {
-            ...template,
-            totalInstances,
-            completedInstances,
-            completionRate: parseFloat(completionRate.toFixed(1)),
-            creatorDisplayName: creatorDisplayName,
-            // Ensure createdAt is a serializable format (ISO string)
-            createdAt: template.createdAt.toDate().toISOString(),
-          };
-        }));
-
-    return {chores: choresWithStats};
-  } catch (error) {
-    console.error("Error fetching recurring chores with stats:", error);
-    throw new HttpsError("internal",
-        "Failed to fetch recurring chores data.");
-  }
-});
-
-
 /**
  * Generates recurring chores for all families.
  * Scheduled to run daily at 7:00 AM Pacific Time.
@@ -204,7 +135,7 @@ exports.getRecurringChoresWithStats = onCall(async (request) => {
 exports.generateDailyChores = onSchedule({
   schedule: "every day 07:00",
   timeZone: "America/Los_Angeles",
-}, async (event) => {
+}, async () => {
   const db = admin.firestore();
   const now = new Date();
   const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
@@ -257,36 +188,17 @@ exports.generateDailyChores = onSchedule({
         }
 
         if (shouldGenerate) {
-          // Check for any existing incomplete chore from this template today.
-          // This uses the predictable ID to prevent duplicates.
+          // Create a predictable, unique ID to prevent race
+          // condition duplicates
           const newChoreId = `${recurringChore.id}_${dateString}`;
-          const existingChoreRef = choresRef.doc(newChoreId);
-          const existingChoreDoc = await existingChoreRef.get();
-
-          if (existingChoreDoc.exists) {
-            console.log(`Skipping generation for "${recurringChore.title}" ` +
-              `for family ${familyId} because a chore for today ` +
-              "already exists.");
-            continue;
-          }
-
-          // Also check for any older incomplete chores from this template
-          const existingIncompleteQuery = choresRef
-              .where("familyId", "==", familyId)
-              .where("recurringTemplateId", "==", recurringChore.id)
-              .where("isComplete", "==", false);
-
-          const incompleteSnapshot = await existingIncompleteQuery.get();
-
-          if (!incompleteSnapshot.empty) {
-            console.log(`Skipping generation for "${recurringChore.title}" ` +
-              `for family ${familyId} because an older incomplete version ` +
-              "already exists.");
-            continue;
-          }
-
-
           const newChoreRef = choresRef.doc(newChoreId);
+
+          const docSnap = await newChoreRef.get();
+          if (docSnap.exists) {
+            console.log(`Skipping generation for "${recurringChore.title}" ` +
+              `for family ${familyId} because it was already generated today.`);
+            continue;
+          }
 
           const newChoreData = {
             ...recurringChore,
@@ -405,20 +317,17 @@ exports.undoRewardPurchase = onCall(async (request) => {
       points: admin.firestore.FieldValue.increment(cost),
     });
 
-    // 2. Put the item back on the marketplace (if it's not a cash redemption)
-    if (redeemedRewardData.providerId !== "CASH_REDEMPTION") {
-      const marketplaceItemRef = db.collection("marketplace_items").doc();
-      batch.set(marketplaceItemRef, {
-        name: redeemedRewardData.name,
-        description: redeemedRewardData.description,
-        cost: redeemedRewardData.cost,
-        providerId: redeemedRewardData.providerId,
-        providerDisplayName: redeemedRewardData.providerDisplayName,
-        familyId: redeemedRewardData.familyId,
-        createdAt: redeemedRewardData.createdAt,
-      });
-    }
-
+    // 2. Put the item back on the marketplace
+    const marketplaceItemRef = db.collection("marketplace_items").doc();
+    batch.set(marketplaceItemRef, {
+      name: redeemedRewardData.name,
+      description: redeemedRewardData.description,
+      cost: redeemedRewardData.cost,
+      providerId: redeemedRewardData.providerId,
+      providerDisplayName: redeemedRewardData.providerDisplayName,
+      familyId: redeemedRewardData.familyId,
+      createdAt: redeemedRewardData.createdAt,
+    });
 
     // 3. Delete the redeemed reward document
     batch.delete(redeemedRewardRef);
