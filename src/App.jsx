@@ -29,6 +29,7 @@ const MainLayout = () => {
     const [isChoreModalOpen, setChoreModalOpen] = useState(false);
     const [editingChore, setEditingChore] = useState(null);
     const [isRewardModalOpen, setRewardModalOpen] = useState(false);
+    const [editingReward, setEditingReward] = useState(null);
     const [isFeedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
     const notificationPanelRef = useRef(null);
@@ -88,6 +89,11 @@ const MainLayout = () => {
         setChoreModalOpen(true);
     };
 
+    const openRewardModal = (rewardToEdit = null) => {
+        setEditingReward(rewardToEdit);
+        setRewardModalOpen(true);
+    };
+
     return (
         <div className="app-container">
             <header className="header">
@@ -111,7 +117,7 @@ const MainLayout = () => {
             <main className="content">
                 <Routes>
                     <Route path="/chores" element={<ChoresPage openChoreModal={openChoreModal} showToast={showToast} />} />
-                    <Route path="/rewards" element={<RewardsPage showToast={showToast} />} />
+                    <Route path="/rewards" element={<RewardsPage openRewardModal={openRewardModal} showToast={showToast} />} />
                     <Route path="/leaderboard" element={<LeaderboardPage />} />
                     <Route path="/activity" element={<ActivityFeedPage />} />
                     <Route path="/profile" element={<ProfilePage showToast={showToast} />} />
@@ -124,13 +130,13 @@ const MainLayout = () => {
             
             <FabContainer 
                 setFeedbackModalOpen={setFeedbackModalOpen} 
-                setRewardModalOpen={setRewardModalOpen} 
+                openRewardModal={openRewardModal} 
                 openChoreModal={openChoreModal} 
             />
 
             <ChoreModal isOpen={isChoreModalOpen} setIsOpen={setChoreModalOpen} editingChore={editingChore} showToast={showToast} />
             {isFeedbackModalOpen && <FeedbackModal setIsOpen={setFeedbackModalOpen} />}
-            {isParent && <RewardModal isOpen={isRewardModalOpen} setIsOpen={setRewardModalOpen} showToast={showToast} />}
+            {isParent && <RewardModal isOpen={isRewardModalOpen} setIsOpen={setRewardModalOpen} editingReward={editingReward} showToast={showToast} />}
 
             {toast.message && (
                 <div style={{ position: "fixed", bottom: "80px", left: "50%", transform: "translateX(-50%)", zIndex: "2000", display: "flex", alignItems: "center", gap: "15px" }} className={`feedback-message ${toast.type === "success" ? "success" : "error"}`} >

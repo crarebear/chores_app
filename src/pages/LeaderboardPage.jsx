@@ -51,33 +51,23 @@ const LeaderboardPage = () => {
             
             <div className="leaderboard-section">
                 <h3>Top Performers</h3>
-                <div className="table-responsive">
-                    <table className="leaderboard-table">
-                        <thead>
-                            <tr>
-                                <th>Rank</th>
-                                <th>Name</th>
-                                <th>Current</th>
-                                <th>Total</th>
-                                <th>Avg/Chore</th>
-                                <th>Avg/Day</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {leaderboardData.map((user, index) => (
-                                <tr key={user.uid} className={index === 0 ? "top-rank" : ""}>
-                                    <td className="rank-cell">
-                                        {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
-                                    </td>
-                                    <td className="name-cell"><strong>{user.displayName || user.email}</strong></td>
-                                    <td className="highlight-points">{user.currentPoints}</td>
-                                    <td>{user.totalPoints}</td>
-                                    <td>{typeof user.avgPointsPerChore === 'number' ? user.avgPointsPerChore.toFixed(1) : user.avgPointsPerChore}</td>
-                                    <td>{typeof user.avgChoresPerDay === 'number' ? user.avgChoresPerDay.toFixed(1) : user.avgChoresPerDay}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="leaderboard-list">
+                    {leaderboardData.map((user, index) => (
+                        <div className={`performer-card ${index === 0 ? "top-rank-card" : ""}`} key={user.uid}>
+                            <div className="performer-rank">
+                                {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
+                            </div>
+                            <div className="performer-info">
+                                <h4>{user.displayName || user.email}</h4>
+                                <div className="performer-metrics">
+                                    <div className="metric-box"><span className="metric-label">Current</span><strong className="metric-value highlight">{user.currentPoints}</strong></div>
+                                    <div className="metric-box"><span className="metric-label">Total</span><strong className="metric-value">{user.totalPoints}</strong></div>
+                                    <div className="metric-box"><span className="metric-label">Avg/Chore</span><strong className="metric-value">{typeof user.avgPointsPerChore === 'number' ? user.avgPointsPerChore.toFixed(1) : user.avgPointsPerChore}</strong></div>
+                                    <div className="metric-box"><span className="metric-label">Avg/Day</span><strong className="metric-value">{typeof user.avgChoresPerDay === 'number' ? user.avgChoresPerDay.toFixed(1) : user.avgChoresPerDay}</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
                 {leaderboardData.length === 0 && <p className="no-data">No performers yet.</p>}
             </div>

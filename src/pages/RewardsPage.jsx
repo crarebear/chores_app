@@ -3,13 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import firebase, { db, functions } from '../firebase';
 import { AuthContext } from '../context/AuthContext';
 
-        const RewardsPage = ({ showToast }) => {
+        const RewardsPage = ({ openRewardModal, showToast }) => {
             const { userData } = useContext(AuthContext);
             const isParent = userData.role === "parent";
             const [activeSubTab, setActiveSubTab] = useState("marketplace");
             
             const renderRewardsContent = () => {
-                const pageProps = { isParent, showToast };
+                const pageProps = { isParent, showToast, openRewardModal };
                 switch (activeSubTab) {
                     case "marketplace": return <Marketplace {...pageProps} />;
                     case "unfulfilled": return <UnfulfilledRewards {...pageProps} />;
@@ -30,7 +30,7 @@ import { AuthContext } from '../context/AuthContext';
         };
 
 
-        const Marketplace = ({ isParent, showToast }) => {
+        const Marketplace = ({ isParent, showToast, openRewardModal }) => {
             const { user, userData } = useContext(AuthContext); 
             const [items, setItems] = useState([]);
             const [isCashModalOpen, setCashModalOpen] = useState(false);
@@ -59,7 +59,9 @@ import { AuthContext } from '../context/AuthContext';
                         isFulfilled: false,
                         fulfilledAt: null, 
                     });
-                    transaction.delete(db.collection("marketplace_items").doc(item.id));
+                    if (!item.isReusable) {
+                        transaction.delete(db.collection("marketplace_items").doc(item.id));
+                    }
                 });
                 showToast("success", "Reward purchased!", () => {
                     db.runTransaction(async (transaction) => {
@@ -67,7 +69,9 @@ import { AuthContext } from '../context/AuthContext';
                         const newPoints = (userDoc.data().points || 0) + item.cost;
                         transaction.update(userRef, { points: newPoints });
                         transaction.delete(purchasedRewardRef);
-                        transaction.set(db.collection("marketplace_items").doc(item.id), item);
+                        if (!item.isReusable) {
+                            transaction.set(db.collection("marketplace_items").doc(item.id), item);
+                        }
                     });
                 });
             };
@@ -97,12 +101,24 @@ import { AuthContext } from '../context/AuthContext';
                         {items.map(item => (
                             <li key={item.id} className="list-item">
                                 <div className="item-details">
-                                    <h4>{item.name}</h4><p>{item.description}</p><p>{item.cost} points</p>
-                                    <p>Provided by: {item.providerDisplayName}</p>
+                                    <h4>{item.name}</h4>
+                                    <p>{item.description}</p>
+                                    <p>
+                                        <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{item.cost} points</span> 
+                                        <span style={{ fontSize: '0.8rem', marginLeft: '10px', color: item.isReusable ? '#10b981' : '#f59e0b', backgroundColor: item.isReusable ? '#ecfdf5' : '#fef3c7', padding: '2px 8px', borderRadius: '12px' }}>
+                                            {item.isReusable ? "Reusable" : "One-Time"}
+                                        </span>
+                                    </p>
+                                    <p style={{ fontSize: '0.85rem' }}>Provided by: {item.providerDisplayName}</p>
                                 </div>
                                 <div className="action-buttons">
                                     <button className="redeem-btn" onClick={() => handlePurchase(item)} disabled={userData.points < item.cost}>Redeem</button>
-                                    {isParent && user.uid === item.providerId && ( <button className="delete-btn" onClick={() => handleDelete(item)}>Delete</button> )}
+                                    {isParent && user.uid === item.providerId && (
+                                        <>
+                                            <button className="edit-btn" style={{backgroundColor: '#6366f1', color: 'white'}} onClick={() => openRewardModal(item)}>Edit</button>
+                                            <button className="delete-btn" onClick={() => handleDelete(item)}>Delete</button>
+                                        </>
+                                    )}
                                 </div>
                             </li>
                         ))}
