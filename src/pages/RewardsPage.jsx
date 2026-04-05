@@ -89,13 +89,13 @@ import { AuthContext } from '../context/AuthContext';
                 <div>
                     <h3 className="section-title">Marketplace</h3>
                     <ul className="list-group">
-                         <li className="list-item" style={{backgroundColor: '#e0f2f1'}}>
+                         <li className="list-item card-special">
                             <div className="item-details">
                                 <h4>Redeem for Cash</h4>
                                 <p>Convert your points into real money!</p>
                             </div>
                             <div className="action-buttons">
-                                <button className="redeem-btn" style={{backgroundColor: '#00796b', color: 'white'}} onClick={() => setCashModalOpen(true)}>Redeem</button>
+                                <button className="btn-special" onClick={() => setCashModalOpen(true)}>Redeem</button>
                             </div>
                         </li>
                         {items.map(item => (
@@ -105,7 +105,7 @@ import { AuthContext } from '../context/AuthContext';
                                     <p>{item.description}</p>
                                     <p>
                                         <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{item.cost} points</span> 
-                                        <span style={{ fontSize: '0.8rem', marginLeft: '10px', color: item.isReusable ? '#10b981' : '#f59e0b', backgroundColor: item.isReusable ? '#ecfdf5' : '#fef3c7', padding: '2px 8px', borderRadius: '12px' }}>
+                                        <span className={`tag ${item.isReusable ? 'tag-reusable' : 'tag-onetime'}`}>
                                             {item.isReusable ? "Reusable" : "One-Time"}
                                         </span>
                                     </p>
@@ -115,7 +115,7 @@ import { AuthContext } from '../context/AuthContext';
                                     <button className="redeem-btn" onClick={() => handlePurchase(item)} disabled={userData.points < item.cost}>Redeem</button>
                                     {isParent && user.uid === item.providerId && (
                                         <>
-                                            <button className="edit-btn" style={{backgroundColor: '#6366f1', color: 'white'}} onClick={() => openRewardModal(item)}>Edit</button>
+                                            <button className="edit-btn" onClick={() => openRewardModal(item)}>Edit</button>
                                             <button className="delete-btn" onClick={() => handleDelete(item)}>Delete</button>
                                         </>
                                     )}

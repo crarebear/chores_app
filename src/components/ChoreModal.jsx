@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import firebase, { db } from '../firebase';
 import { AuthContext } from '../context/AuthContext';
+import CustomDatePicker from './CustomDatePicker';
 
 const ChoreModal = ({ isOpen, setIsOpen, editingChore, showToast }) => {
     const { user, userData, familyMembers, familyData } = useContext(AuthContext);
@@ -110,9 +111,23 @@ const ChoreModal = ({ isOpen, setIsOpen, editingChore, showToast }) => {
                     <div className="input-group"><label>Title:</label><input type="text" value={newChore} onChange={(e) => setNewChore(e.target.value)} required /></div>
                     <div className="input-group"><label>Points:</label><input type="number" min="1" value={pointsValue} onChange={(e) => setPointsValue(e.target.value)} required /></div>
                     <div className="input-group"><label>Room:</label><select value={room} onChange={(e) => setRoom(e.target.value)}><option value="">Select Room</option>{(familyData?.rooms || []).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-                    <div className="input-group"><label>Repeat?</label><div className="radio-group"><label><input type="radio" name="repeat" checked={!isRepeating} onChange={() => setIsRepeating(false)} /> No</label><label><input type="radio" name="repeat" checked={isRepeating} onChange={() => setIsRepeating(true)} /> Yes</label></div></div>
+                    <div className="toggle-row" onClick={() => setIsRepeating(!isRepeating)}>
+                        <div className="toggle-text">
+                            <span className="toggle-title">Repeat Chore?</span>
+                            <span className="toggle-desc">Create recurring entries for this task</span>
+                        </div>
+                        <div className={`toggle-switch ${isRepeating ? 'active' : ''}`}></div>
+                    </div>
+
                     {!isRepeating && (
-                        <div className="input-group"><label>Complete By Date (Optional):</label><input type="date" value={completeBy} onChange={(e) => setCompleteBy(e.target.value)} /></div>
+                        <div className="input-group">
+                            <label>Complete By Date (Optional):</label>
+                            <CustomDatePicker 
+                                value={completeBy} 
+                                onChange={(date) => setCompleteBy(date)} 
+                                placeholder="Choose a deadline"
+                            />
+                        </div>
                     )}
                     {isRepeating && (
                         <>
