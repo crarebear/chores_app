@@ -82,14 +82,19 @@ const SortableChoreItem = (props) => {
         position: 'relative'
     };
 
-    const isPastDue = chore.completeBy && new Date(chore.completeBy + "T00:00:00") < new Date(new Date().setHours(0, 0, 0, 0));
+    const isPastDue = chore.completeBy && new Date(chore.completeBy + "T00:00:00") <= new Date(new Date().setHours(0, 0, 0, 0));
 
     return (
         <li ref={setNodeRef} style={style} className={`list-item`} {...attributes} {...listeners}>
             <div className="item-details">
                 <h4>{chore.title}</h4>
                 <p>{chore.points} points {chore.room && `• ${chore.room}`}</p>
-                {chore.completeBy && <p style={{ color: isPastDue ? 'var(--danger)' : 'inherit', fontWeight: isPastDue ? 'bold' : 'normal' }}>Complete by: {new Date(chore.completeBy + "T00:00:00").toLocaleDateString()}</p>}
+                {chore.completeBy && (
+                    <p style={{ color: isPastDue ? 'var(--danger)' : 'inherit', fontWeight: isPastDue ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        {isPastDue && <span role="img" aria-label="overdue">⚠️</span>}
+                        Complete by: {new Date(chore.completeBy + "T00:00:00").toLocaleDateString()}
+                    </p>
+                )}
                 {isAssignedList && <p>Assigned to: {chore.assignedToDisplayName}</p>}
             </div>
             <div className="action-buttons" onPointerDown={(e) => e.stopPropagation()}>

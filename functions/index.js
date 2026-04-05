@@ -466,7 +466,8 @@ exports.logUserJoined = onDocumentUpdated("users/{userId}", (event) => {
  * @return {Promise|null} A promise that resolves when the message is sent.
  */
 async function sendNotification(uid, preferenceKey, payload) {
-  const userDoc = await admin.firestore().collection("users").doc(uid).get();
+  const db = admin.firestore();
+  const userDoc = await db.collection("users").doc(uid).get();
   if (!userDoc.exists) {
     return null;
   }
@@ -475,6 +476,17 @@ async function sendNotification(uid, preferenceKey, payload) {
   if (prefs[preferenceKey] === false) {
     return null;
   }
+
+  // Create an in-app notification record in Firestore
+  const notificationRecord = {
+    recipientUid: uid,
+    message: payload.notification.body,
+    title: payload.notification.title,
+    isRead: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  await db.collection("notifications").add(notificationRecord);
+
   if (userData.fcmToken) {
     return admin.messaging().send({...payload, token: userData.fcmToken});
   }
