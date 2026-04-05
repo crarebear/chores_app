@@ -288,7 +288,7 @@ body {
 /* Special Cards & Tags */
 .card-special {
     background-color: #e0f2f1; /* Light Mode Seafoam */
-    border-left: 5px solid #00796b;
+    border: 1.5px solid #004d40;
 }
 
 [data-theme='dark'] .card-special {
