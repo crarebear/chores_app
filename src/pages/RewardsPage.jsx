@@ -147,10 +147,21 @@ import { AuthContext } from '../context/AuthContext';
             }, [userData.familyId]);
 
             const handleFulfill = async (rewardId) => {
-                await db.collection("purchased_rewards").doc(rewardId).update({ isFulfilled: true, fulfilledAt: firebase.firestore.FieldValue.serverTimestamp() }); 
-                 showToast("success", "Reward fulfilled!", () => {
-                    db.collection("purchased_rewards").doc(rewardId).update({ isFulfilled: false, fulfilledAt: null });
-                });
+                try {
+                    await db.collection("purchased_rewards").doc(rewardId).update({ 
+                        isFulfilled: true, 
+                        fulfilledAt: firebase.firestore.FieldValue.serverTimestamp() 
+                    }); 
+                    showToast("success", "Reward fulfilled!", () => {
+                        db.collection("purchased_rewards").doc(rewardId).update({ 
+                            isFulfilled: false, 
+                            fulfilledAt: null 
+                        });
+                    });
+                } catch (error) {
+                    console.error("Fulfillment error:", error);
+                    showToast("error", "Failed to fulfill reward. Please check your connection.");
+                }
             };
             
             return (
