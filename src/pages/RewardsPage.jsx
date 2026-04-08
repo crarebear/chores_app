@@ -46,34 +46,39 @@ import { AuthContext } from '../context/AuthContext';
             const handlePurchase = async (item) => {
                 const userRef = db.collection("users").doc(user.uid); 
                 const purchasedRewardRef = db.collection("purchased_rewards").doc();
-                await db.runTransaction(async (transaction) => {
-                    const userDoc = await transaction.get(userRef);
-                    if (!userDoc.exists || (userDoc.data()?.points || 0) < item.cost) { throw new Error("Not enough points!"); }
-                    const newPoints = (userDoc.data().points || 0) - item.cost;
-                    transaction.update(userRef, { points: newPoints });
-                    transaction.set(purchasedRewardRef, { 
-                        ...item, // copy all fields
-                        purchasedBy: user.uid,
-                        purchasedByDisplayName: userData.displayName, 
-                        purchasedAt: firebase.firestore.FieldValue.serverTimestamp(), 
-                        isFulfilled: false,
-                        fulfilledAt: null, 
-                    });
-                    if (!item.isReusable) {
-                        transaction.delete(db.collection("marketplace_items").doc(item.id));
-                    }
-                });
-                showToast("success", "Reward purchased!", () => {
-                    db.runTransaction(async (transaction) => {
+                try {
+                    await db.runTransaction(async (transaction) => {
                         const userDoc = await transaction.get(userRef);
-                        const newPoints = (userDoc.data().points || 0) + item.cost;
+                        if (!userDoc.exists || (userDoc.data()?.points || 0) < item.cost) { throw new Error("Not enough points!"); }
+                        const newPoints = (userDoc.data().points || 0) - item.cost;
                         transaction.update(userRef, { points: newPoints });
-                        transaction.delete(purchasedRewardRef);
+                        transaction.set(purchasedRewardRef, { 
+                            ...item, // copy all fields
+                            purchasedBy: user.uid,
+                            purchasedByDisplayName: userData.displayName, 
+                            purchasedAt: firebase.firestore.FieldValue.serverTimestamp(), 
+                            isFulfilled: false,
+                            fulfilledAt: null, 
+                        });
                         if (!item.isReusable) {
-                            transaction.set(db.collection("marketplace_items").doc(item.id), item);
+                            transaction.delete(db.collection("marketplace_items").doc(item.id));
                         }
                     });
-                });
+                    showToast("success", "Reward purchased!", () => {
+                        db.runTransaction(async (transaction) => {
+                            const userDoc = await transaction.get(userRef);
+                            const newPoints = (userDoc.data()?.points || 0) + item.cost;
+                            transaction.update(userRef, { points: newPoints });
+                            transaction.delete(purchasedRewardRef);
+                            if (!item.isReusable) {
+                                transaction.set(db.collection("marketplace_items").doc(item.id), item);
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.error("Purchase error:", error);
+                    showToast("error", error.message || "Failed to purchase reward.");
+                }
             };
             
             const handleDelete = async (item) => {
