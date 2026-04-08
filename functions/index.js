@@ -188,8 +188,24 @@ exports.generateDailyChores = onSchedule({
         }
 
         if (shouldGenerate) {
-          // Create a predictable, unique ID to prevent race
-          // condition duplicates
+          // 1. Check for any uncompleted instance of this recurring chore
+          // to avoid stacking multiple undone versions of the same task.
+          const existingUncompleted = await choresRef
+              .where("familyId", "==", familyId)
+              .where("recurringTemplateId", "==", recurringChore.id)
+              .where("isComplete", "==", false)
+              .limit(1)
+              .get();
+
+          if (!existingUncompleted.empty) {
+            console.log(`Skipping generation for "${recurringChore.title}" ` +
+              `for family ${familyId} because an incomplete version ` +
+              `already exists.`);
+            continue;
+          }
+
+          // 2. Create a predictable, unique ID to prevent race
+          // condition duplicates for the same day
           const newChoreId = `${recurringChore.id}_${dateString}`;
           const newChoreRef = choresRef.doc(newChoreId);
 
