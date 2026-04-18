@@ -38,7 +38,7 @@ import { AuthContext } from '../context/AuthContext';
             useEffect(() => {
                 if(!userData.familyId) return;
                 const unsubscribe = db.collection("marketplace_items").where("familyId", "==", userData.familyId).orderBy("cost", "asc").onSnapshot(snapshot => {
-                    setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
                 });
                 return () => unsubscribe();
             }, [userData.familyId]);
@@ -51,9 +51,10 @@ import { AuthContext } from '../context/AuthContext';
                         const userDoc = await transaction.get(userRef);
                         if (!userDoc.exists || (userDoc.data()?.points || 0) < item.cost) { throw new Error("Not enough points!"); }
                         const newPoints = (userDoc.data().points || 0) - item.cost;
+                        const { id: _, ...itemData } = item;
                         transaction.update(userRef, { points: newPoints });
                         transaction.set(purchasedRewardRef, { 
-                            ...item, // copy all fields
+                            ...itemData, // copy all fields except the old ID
                             purchasedBy: user.uid,
                             purchasedByDisplayName: userData.displayName, 
                             purchasedAt: firebase.firestore.FieldValue.serverTimestamp(), 
@@ -142,7 +143,7 @@ import { AuthContext } from '../context/AuthContext';
             useEffect(() => {
                 if(!userData.familyId) return;
                 const unsubscribe = db.collection("purchased_rewards").where("familyId", "==", userData.familyId).where("isFulfilled", "==", false).orderBy("purchasedAt", "desc")
-                    .onSnapshot(snapshot => setRewards(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+                    .onSnapshot(snapshot => setRewards(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))));
                 return () => unsubscribe();
             }, [userData.familyId]);
 
@@ -188,7 +189,7 @@ import { AuthContext } from '../context/AuthContext';
             const [log, setLog] = useState([]);
             useEffect(() => { 
                 if(!userData.familyId) return;
-                const unsubscribe = db.collection("purchased_rewards").where("familyId", "==", userData.familyId).where("isFulfilled", "==", true).orderBy("fulfilledAt", "desc").onSnapshot(snapshot => { setLog(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); }); return () => unsubscribe(); 
+                const unsubscribe = db.collection("purchased_rewards").where("familyId", "==", userData.familyId).where("isFulfilled", "==", true).orderBy("fulfilledAt", "desc").onSnapshot(snapshot => { setLog(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))); }); return () => unsubscribe(); 
             }, [userData.familyId]);
             return (
                 <div>

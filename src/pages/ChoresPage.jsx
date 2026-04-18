@@ -130,7 +130,7 @@ const Chores = ({ openChoreModal, isParent, showToast }) => {
             .where("isComplete", "==", false)
             .where("assignedTo", "==", null)
             .onSnapshot(snapshot => { 
-                let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); 
+                let docs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })); 
                 docs.sort((a,b) => {
                     const orderA = a.order !== undefined ? a.order : (a.createdAt ? a.createdAt.toMillis() : 0);
                     const orderB = b.order !== undefined ? b.order : (b.createdAt ? b.createdAt.toMillis() : 0);
@@ -282,7 +282,7 @@ const RecurringChoresManager = ({ openChoreModal, showToast }) => {
     useEffect(() => { 
         if (!userData?.familyId) return; 
         const unsubscribe = db.collection("recurring_chores").where("familyId", "==", userData.familyId).orderBy("createdAt", "desc").onSnapshot(snapshot => { 
-            setRecurringChores(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))); 
+            setRecurringChores(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))); 
         }); 
         return () => unsubscribe(); 
     }, [userData?.familyId]);
